@@ -19,6 +19,8 @@
 using namespace std;
 using namespace cv;
 
+#define printff if(0)printf //printf
+
 /* global variable */
 G_textdetect_t G_td;
 
@@ -114,8 +116,9 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	// horizontal crossig
 	get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
 
-	printf("[%d] out feature : \n BB:%d,%d,%d,%d\n PR:%d\n EN:%d\n HC:%d,%d,%d,%d\n", 
-		feat_id_to, feat_to->BB.val[0], feat_to->BB.val[1], feat_to->BB.val[2], feat_to->BB.val[3],
+	printff("[%d] val %d size %d\n out feature : \n BB:%d,%d,%d,%d\n PR:%d\n EN:%d\n HC:%d,%d,%d,%d\n", 
+		feat_id_to, G_td.ERs[feat_id_to].ER_val, G_td.ERs[feat_id_to].ER_size,
+		feat_to->BB.val[0], feat_to->BB.val[1], feat_to->BB.val[2], feat_to->BB.val[3],
 		feat_to->PR.val[0], feat_to->EN.val[0], *(((int*)feat_to->HC.val[0])+0), *(((int*)feat_to->HC.val[0])+1), *(((int*)feat_to->HC.val[0])+2), *(((int*)feat_to->HC.val[0])+3));
 
 	// relase memory
@@ -155,7 +158,7 @@ ER_t *linear_reduction(ER_t *T)
 	int a = T->ER_id;
 	if (T->ER_firstChild ==-1) {
 		// has no child
-		printf("[%d] has no child, return %d\n",a,T->ER_id);
+		printff("[%d] has no child, return %d\n",a,T->ER_id);
 
 		/* ---------------------------- START ---------------------------------*/
 		// <====== Feature extraction (in/crementally computed from Null => T)
@@ -165,10 +168,10 @@ ER_t *linear_reduction(ER_t *T)
 		return T;
 	} else if (T->to_firstChild->ER_nextSibling==-1) {
 		// has only one child
-		printf("[%d] %d has one child\n",a,T->ER_id);
-		printf("[%d] %d go linear reduction \n",a,T->to_firstChild->ER_id);
+		printff("[%d] %d has one child\n",a,T->ER_id);
+		printff("[%d] %d go linear reduction \n",a,T->to_firstChild->ER_id);
 		ER_t *c = linear_reduction(T->to_firstChild);
-		printf("[%d] %d returned from linear reduction \n",a,c->ER_id);
+		printff("[%d] %d returned from linear reduction \n",a,c->ER_id);
 		if (1){//(T->ER_val<c->ER_val) {       // put selection algo here
 			// link T to its new child "c"
 			c->ER_nextSibling = c->to_parent->ER_nextSibling;
@@ -185,8 +188,8 @@ ER_t *linear_reduction(ER_t *T)
 			}
 			c->ER_parent = T->ER_id;
 			c->to_parent = T;
-			printf("[%d] link %d to its new child %d\n",a,T->ER_id,c->ER_id);
-			printf("[%d] return %d \n",a,T->ER_id);
+			printff("[%d] link %d to its new child %d\n",a,T->ER_id,c->ER_id);
+			printff("[%d] return %d \n",a,T->ER_id);
 
 			/* ---------------------------- START ---------------------------------*/
 			// Feature extraction (incrementally computed from T->firstChild => T)
@@ -196,24 +199,24 @@ ER_t *linear_reduction(ER_t *T)
 
 			return T; // T is better
 		} else {
-			printf("[%d] return %d \n",a,c->ER_id);
+			printff("[%d] return %d \n",a,c->ER_id);
 			return c; // c is better
 		}
 	} else {
 		// has more than two children
-		printf("[%d] %d has more than two child\n",a,T->ER_id);
+		printff("[%d] %d has more than two child\n",a,T->ER_id);
 		ER_t *c = T->to_firstChild;
 		int childNo = 0;
 		while (c) {
-			printf("[%d] %d go linear reduction \n",a,c->ER_id);
+			printff("[%d] %d go linear reduction \n",a,c->ER_id);
 
 			//G_td.featraw[c->ER_id].HC_vec = (int *)malloc(G_td.img->rows*sizeof(int));
 			ER_t *d = linear_reduction(c);
 
-			printf("[%d] %d returned from linear reduction \n",a,d->ER_id);
+			printff("[%d] %d returned from linear reduction \n",a,d->ER_id);
 			// link T to its new child "d"
 			childNo++;
-			if (T->ER_firstChild!=d->ER_id) {
+			if ((T->ER_firstChild!=d->ER_id) && (c->ER_id!=d->ER_id)) {
 				if (childNo==1) {
 					T->ER_firstChild = d->ER_id;
 					T->to_firstChild = d;
@@ -233,11 +236,11 @@ ER_t *linear_reduction(ER_t *T)
 				d->ER_parent = T->ER_id;
 				d->to_parent = T;
 			}
-			printf("[%d] link %d to its new child %d\n",a,T->ER_id,d->ER_id);
+			printff("[%d] link %d to its new child %d\n",a,T->ER_id,d->ER_id);
 			// next T's child
 			c = c->to_nextSibling;
 		}
-		printf("[%d] return %d \n",a,T->ER_id);
+		printff("[%d] return %d \n",a,T->ER_id);
 
 		/* ---------------------------- START ---------------------------------*/
 		// Feature extraction (incrementally computed from T->firstChild => T)
@@ -297,14 +300,16 @@ void main_sample_2(void)
 		// prepare for getting ER candidates
 		G_td.featraw = (featraw_t *)malloc(ER_no*sizeof(featraw_t));
 		memset(G_td.featraw, 0, ER_no*sizeof(featraw_t));
-		//G_td.HC_vec = (int *)malloc(img.rows*sizeof(int));
-			
+
 		// get ER candidates
 		get_ER_candidates();
-
-
-		//ER_tree_traversal(&ERs[ER_no-1]);
+		free(ERs);
+		free(pts);
 		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
+
+		printf("main_sample_2 test is good\n");
+		char ch;
+		scanf("%c", &ch);
 	}
 }
 
@@ -316,9 +321,9 @@ int main_sample_1(void)
 	int img_rows = 4;
 	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
 	u8* img_ptr = img_data;
-	img_ptr[0] =  1; img_ptr[1] =  2; img_ptr[2] =  3; img_ptr[3] =  7;
-	img_ptr[4] =  2; img_ptr[5] =  2; img_ptr[6] =  3; img_ptr[7] =  6;
-	img_ptr[8] =  3; img_ptr[9] =  3; img_ptr[10] = 3; img_ptr[11] = 5;
+	img_ptr[0] =  1; img_ptr[1] =  2; img_ptr[2] =  3; img_ptr[3] =  1;
+	img_ptr[4] =  2; img_ptr[5] =  2; img_ptr[6] =  3; img_ptr[7] =  2;
+	img_ptr[8] =  3; img_ptr[9] =  3; img_ptr[10] = 3; img_ptr[11] = 2;
 	img_ptr[12] = 1; img_ptr[13] = 2; img_ptr[14] = 3; img_ptr[15] = 4;
 	Mat img;
 	img.rows = img_rows;
@@ -339,17 +344,12 @@ int main_sample_1(void)
 	G_td.featraw = (featraw_t *)malloc(ER_no*sizeof(featraw_t));
 	memset(G_td.featraw, 0, ER_no*sizeof(featraw_t));
 
-	//G_td.HC_vec = (int *)malloc(img.rows*sizeof(int));
-	//memset(G_td.HC_vec, 0, img.rows*sizeof(int));
-			
 	// get ER candidates
 	get_ER_candidates();
 
-	//ER_tree_traversal(&ERs[ER_no-1]);
-	printf("this test is good\n");
+	printf("main_sample_1 test is good\n");
 	char ch;
 	scanf("%c", &ch);
-
 
 	free(ERs);
 	free(pts);
@@ -360,7 +360,7 @@ int main_sample_1(void)
 int main(void)
 {
 
-	main_sample_1();
+	main_sample_2();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;

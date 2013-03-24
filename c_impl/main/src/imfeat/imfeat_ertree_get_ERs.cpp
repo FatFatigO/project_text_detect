@@ -449,7 +449,7 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 		ptsptr->pt.x = i&stepmask;
 		ptsptr->pt.y = i>>stepgap;
 		ptsptr->flag = 0;//(*imgptr)&0xff;
-		if ((*imgptr)&0xff > *max_val) *max_val = (*imgptr)&0xff;
+		if (((*imgptr)&(0xff)) > *max_val) *max_val = (*imgptr)&(0xff);
 		u32 *ptsmap_ptr = (u32 *)pts_map;
 		memcpy(&ptsmap_ptr[i+step+1], &ptsptr, sizeof(u32));
 		//ptsptr->pt = cvPoint( i&stepmask, i>>stepgap ); // from index i to coordinate (x,y)
@@ -642,9 +642,9 @@ int _get_ERs(
 			cur_pt->r = ptsmap_ptr[i+1]==NULL ? dummy_pt : (LinkedPoint *)ptsmap_ptr[i+1];
 			cur_pt->t = ptsmap_ptr[i-step]==NULL ? dummy_pt : (LinkedPoint *)ptsmap_ptr[i-step];
 			cur_pt->b = ptsmap_ptr[i+step]==NULL ? dummy_pt : (LinkedPoint *)ptsmap_ptr[i+step];
-			if (cur_pt->l==dummy_pt && cur_pt->r!=dummy_pt)
+			if (cur_pt->l==dummy_pt && cur_pt!=dummy_pt)
 				row_1st_pt = cur_pt;
-			if (cur_pt->l!=dummy_pt && cur_pt->r==dummy_pt)
+			if (cur_pt->l!=dummy_pt && cur_pt==dummy_pt)
 				row_1st_pt = NULL;
 			if (row_1st_pt!=NULL)
 				cur_pt->prev = row_1st_pt; //overwrite prev as row_1st_pt for each data pt
