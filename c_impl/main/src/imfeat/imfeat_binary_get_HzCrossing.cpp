@@ -18,8 +18,14 @@ void get_HzCrossing(IN p8_t *pt, IN p1_t *feat_in, OUT p1_t *feat_out)
 	// proprocess: label pixel
 	imfeat_util_label_pixels(1, pt);
 	
-	// calc hohrizontal crossing
+	// go back to (0,0) first
 	LinkedPoint *row_1st_pt = pts;
+	int shift_l = row_1st_pt->pt.x;
+	int shift_t = row_1st_pt->pt.y;
+	for (int i=0; i<shift_l; i++) row_1st_pt = row_1st_pt->l;
+	for (int i=0; i<shift_t; i++) row_1st_pt = row_1st_pt->t;
+
+	// calc hohrizontal crossing
 	for (int h=0; h<img_rows; h++, row_1st_pt=row_1st_pt->b) {
 		LinkedPoint *cur = row_1st_pt;
 		int q = 0;

@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <time.h>
+#include <cv.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 /*
@@ -23,39 +24,6 @@ using namespace cv;
 
 /* global variable */
 G_textdetect_t G_td;
-
-/*
-void calc_incremental_feature(ER_t *ER_fr, ER_t *ER_to)
-{
-	p7_t pt;
-	pt.val[0] = (u32)ER_to->ER_head;
-	pt.val[1] = ER_to->ER_size;
-	pt.val[2] = (u32)((ER_fr==NULL) ? NULL : ER_fr->ER_head);
-	pt.val[3] = (u32)((ER_fr==NULL) ? 0 : ER_fr->ER_size);
-	pt.val[4] = (u32)G_td.pts;
-	pt.val[5] = G_td.img->rows;
-	pt.val[6] = G_td.img->cols;
-	featraw_t feat_dm; 
-	memset(&feat_dm, 0, sizeof(featraw_t)); 
-	//feat_dm.HC.val[0] = (u32)G_td.HC_vec;
-	featraw_t *feat_fr = (ER_fr==NULL) ? &feat_dm : &G_td.featraw[ER_fr->ER_id];
-	featraw_t *feat_to = &G_td.featraw[ER_to->ER_id];
-
-	// bounding box
-	get_BoundingBox(IN pt, IN feat_fr->BB, OUT &feat_to->BB);
-
-	// perimeter
-	get_Perimeter(IN pt, IN feat_fr->PR, OUT &feat_to->PR);
-
-	// euler no
-	get_EulerNo(IN pt, IN feat_fr->EN, OUT &feat_to->EN);
-
-	// euler horizontal crossig
-	feat_fr->HC.val[0] = (u32)G_td.HC_vec;
-	feat_to->HC.val[0] = (u32)G_td.HC_vec;
-	get_HzCrossing(IN pt, IN feat_fr->HC, OUT &feat_to->HC);
-}
-*/
 
 void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 {
@@ -83,11 +51,8 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	}
 
 	// init "to" param
-	//if (no_fr <= 1) {
-		// allocate HC_buf in leaf node (where no_fr==0)
-		G_td.featraw[feat_id_to].HC_buf = (int *)malloc(G_td.img->rows*sizeof(int));
-		memset((void *)G_td.featraw[feat_id_to].HC_buf, 0, G_td.img->rows*sizeof(int));
-	//}
+	G_td.featraw[feat_id_to].HC_buf = (int *)malloc(G_td.img->rows*sizeof(int));
+	memset((void *)G_td.featraw[feat_id_to].HC_buf, 0, G_td.img->rows*sizeof(int));
 	featraw_t *feat_to = &G_td.featraw[feat_id_to];
 	G_td.featraw[feat_id_to].HC.val[0] = (u32)G_td.featraw[feat_id_to].HC_buf;
 	int pt_to_start_idx = G_td.ERs[feat_id_to].ER_head->pt_order;
@@ -275,14 +240,26 @@ void main_sample_2(void)
 	int img_no;
 
 	fin >> img_no;
-	for (int i=1; i<=img_no; i++)
+	for (int ii=1; ii<=img_no; ii++)
 	{
 		clock_t tStart = clock();
-
+		
 		// get image
 		char path_img[128];
 		fin >> path_img;
-		Mat img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
+		Mat img;
+		if (0) {
+			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
+		} else {
+			double percent = 25;
+			IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100) , (int)((src->height*percent)/100) ), src->depth, src->nChannels);
+			cvResize(src, dst, CV_INTER_LINEAR);
+			img = dst;
+			//cvNamedWindow("a");
+			//cvShowImage("a", dst);
+			//cvWaitKey(0);
+		}
 		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
 
 		// get ERs
@@ -305,9 +282,14 @@ void main_sample_2(void)
 		get_ER_candidates();
 		free(ERs);
 		free(pts);
+		for (int i=0; i<ER_no; i++) {
+			if (G_td.featraw[i].HC_buf)
+				free(G_td.featraw[i].HC_buf);
+		}
+		free(G_td.featraw);
 		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
 
-		printf("main_sample_2 test is good\n");
+		printf("[%d] main_sample_2 test is good\n", ii);
 		char ch;
 		scanf("%c", &ch);
 	}

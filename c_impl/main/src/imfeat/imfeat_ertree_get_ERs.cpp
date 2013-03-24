@@ -612,7 +612,6 @@ int _get_ERs(
 				ER_t* cur = &ERs[i];
 				root->ER_firstChild = i;
 				root->to_firstChild = cur;
-				root->ER_head = cur->ER_head;
 				while (cur) {
 					cur->ER_parent = root->ER_id;
 					cur->to_parent = root;
@@ -622,6 +621,12 @@ int _get_ERs(
 			}
 		}
 	}
+	// assign ER_head as the first point
+	LinkedPoint *cur_pt = pts;
+	while (cur_pt->prev != NULL) {
+		cur_pt++;
+	}
+	root->ER_head = cur_pt;
 	root->ER_val = max_val;
 	no_ER ++;
 
@@ -634,7 +639,7 @@ int _get_ERs(
 
 	// add l,t,r,b ptr for each point
 	u32 *ptsmap_ptr = (u32 *)pts_map;
-	LinkedPoint *cur_pt, *row_1st_pt;
+	LinkedPoint *row_1st_pt;
 	for (int i=0; i<(src->rows+2)*step; i++) {
 		cur_pt = (LinkedPoint *)ptsmap_ptr[i];
 		if (cur_pt!=NULL) {
@@ -678,6 +683,7 @@ int get_ERs(
 	img.rows = img_rows;
 	img.cols = img_cols;
 	img.step = img_cols;
+	pt_order = 0;
 
 	return _get_ERs(&img, ERs, pts, reverse);
 }
