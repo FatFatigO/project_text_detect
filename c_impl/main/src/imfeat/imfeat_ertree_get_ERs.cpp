@@ -93,35 +93,11 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 
 		// when new a hist, check if comp's hist has sibling, if yes, assign same parent to all sibling 
 		ER_t* cur = comp->history->to_nextSibling;
-		int max_size = 0, max_size_id = -1;
 		while ( cur )
 		{
-			if (cur->ER_size > max_size) {
-				max_size = cur->ER_size;
-				max_size_id = cur->ER_id;
-			}
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
 			cur = cur->to_nextSibling;
-		}
-		// adjust to make sure firstChild to be the child with largest size
-		if (0){//(comp->history->ER_size < max_size) {
-			comp->history->to_parent->ER_firstChild = max_size_id;
-			comp->history->to_parent->to_firstChild = &hist_start[max_size_id];
-			// switch size
-			hist_start[max_size_id].ER_size = comp->history->ER_size;
-			comp->history->ER_size = max_size;
-			// switch child
-			ER_t *chd_new_max = comp->history->to_firstChild;
-			ER_t *chd_new_1st = hist_start[max_size_id].to_firstChild;
-			comp->history->ER_firstChild = chd_new_1st->ER_id;
-			comp->history->to_firstChild = chd_new_1st;
-			chd_new_1st->ER_parent = comp->history->ER_id;
-			chd_new_1st->to_parent = comp->history;
-			hist_start[max_size_id].ER_firstChild = chd_new_max->ER_id;
-			hist_start[max_size_id].to_firstChild = chd_new_max;
-			chd_new_max->ER_parent = hist_start[max_size_id].ER_id;
-			chd_new_max->to_parent = &hist_start[max_size_id];
 		}
 	}
 	history->val = comp->grey_level;
@@ -219,6 +195,15 @@ MSERMergeComp( MSERConnectedComp* comp1,
 		} 
 		comp1->history->ER_parent = history->ER_id;
 		comp1->history->to_parent = history;
+
+		// when new a hist, check if comp's hist has sibling, if yes, assign same parent to all sibling 
+		ER_t* cur = comp1->history->to_nextSibling;
+		while ( cur )
+		{
+			cur->ER_parent = history->ER_id;
+			cur->to_parent = history;
+			cur = cur->to_nextSibling;
+		}
 	}
 	if ( NULL != comp2->history )
 	{
@@ -227,21 +212,6 @@ MSERMergeComp( MSERConnectedComp* comp1,
 		history->to_nextSibling = comp2->history;
 		comp2->history->ER_prevSibling = history->ER_id;
 		comp2->history->to_prevSibling = history;
-#if 0
-		// in order to make every firstChild to be the one with max size
-		// it's possible to correct the order here, switch it to the correct order.
-		// 2013/03/15 10:55pm
-		if (comp2->history->ER_size > history->ER_size) {
-			history->
-
-		} else {
-			// every hist exists in comp's hist is cur hist's sibling
-			history->ER_nextSibling = comp2->history->ER_id;
-			history->to_nextSibling = comp2->history;
-			comp2->history->ER_prevSibling = history->ER_id;
-			comp2->history->to_prevSibling = history;
-		}
-#endif
 	}
 
 	comp->head = head;
