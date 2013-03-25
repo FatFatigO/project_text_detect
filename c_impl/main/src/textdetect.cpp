@@ -97,19 +97,77 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	}
 }
 
+
+/*
+procedure TREE-ACCUMULATION(T)
+2: if nchildren[T] >= 2 then
+3:		C = empty;
+4:		for each c in children[T] do
+5:			C = C union TREE-ACCUMULATION(c)
+6:		end for
+7:		if var[T] <= min-var[C] then
+8:			discard-children(T)
+9:			return T
+10:		else
+11:			return C
+12:		end if
+13: else // nchildren[T] = 0
+14:		return T
+15: end if
+end procedure
+*/
+
+bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
+{
+	//if var[T] <= min-var[C] then
+	return true;
+}
+
+void tree_accumulation(ER_t *T, int *out_no, ER_t **out)
+{
+	if (T->ER_firstChild ==-1) {
+		// has no child
+		out[*out_no] = T;
+		*out_no += 1;
+		return;
+	} else if (T->to_firstChild->ER_nextSibling!=-1) {
+		// has more than two children
+		ER_t *c = T->to_firstChild;
+		while (c) {
+			tree_accumulation(c, out_no, out);
+			c = c->to_nextSibling;
+		}
+		if (tree_accumulation_algo(T, *out_no, out)) {
+			//discard-children(T)
+			T->ER_firstChild = -1;
+			T->to_firstChild = NULL;
+			//return T
+			*out_no = 0;
+			return;
+		} else {
+			//return C
+			return;
+		}
+	} else {
+		// has only one child
+		// after linear reduction, there should be no such case
+		assert(0);
+	}
+}
+
 /*
 procedure LINEAR-REDUCTION(T)
 2: if nchildren[T] = 0 then
 3:		return T
 4: else if nchildren[T] = 1 then
 5:		c = LINEAR-REDUCTION(child[T])
-6:		if var[T]  var[c] then
+6:		if var[T] <= var[c] then
 7:			link-children(T, children[c])
 8:			return T
 9:		else
 10:			return c
 11:		end if
-12:else % nchildren[T]  2
+12:else // nchildren[T] = 2
 13:		for each c 2 children[T] do
 14:			link-children(T, LINEAR-REDUCTION(c))
 15:		end for
@@ -117,6 +175,12 @@ procedure LINEAR-REDUCTION(T)
 17:end if
 end procedure
 */
+
+bool linear_reduction_algo(ER_t *T, ER_t *c)
+{
+	//(T->ER_val<c->ER_val)
+	return true;
+}
 
 ER_t *linear_reduction(ER_t *T)
 {
@@ -137,30 +201,24 @@ ER_t *linear_reduction(ER_t *T)
 		printff("[%d] %d go linear reduction \n",a,T->to_firstChild->ER_id);
 		ER_t *c = linear_reduction(T->to_firstChild);
 		printff("[%d] %d returned from linear reduction \n",a,c->ER_id);
-		if (1){//(T->ER_val<c->ER_val) {       // put selection algo here
-			// link T to its new child "c"
-			c->ER_nextSibling = c->to_parent->ER_nextSibling;
-			c->to_nextSibling = c->to_parent->to_nextSibling;
-			if (c->to_nextSibling) {
-				c->to_nextSibling->to_prevSibling = c;
-				c->to_nextSibling->ER_prevSibling = c->ER_id;
-			}
-			c->ER_prevSibling = c->to_parent->ER_prevSibling;
-			c->to_prevSibling = c->to_parent->to_prevSibling;
-			if (c->to_prevSibling) {
-				c->to_prevSibling->to_nextSibling = c;
-				c->to_prevSibling->ER_nextSibling = c->ER_id;
-			}
-			c->ER_parent = T->ER_id;
-			c->to_parent = T;
-			printff("[%d] link %d to its new child %d\n",a,T->ER_id,c->ER_id);
-			printff("[%d] return %d \n",a,T->ER_id);
-
+		if (linear_reduction_algo(T,c)){       // put selection algo here
 			/* ---------------------------- START ---------------------------------*/
 			// Feature extraction (incrementally computed from T->firstChild => T)
 			int *fr_id = &T->to_firstChild->ER_id;
 			calc_incremental_feature_multi(1, fr_id, T->ER_id);
 			/* ----------------------------- END ----------------------------------*/
+
+			// link T to its new child, "c's child"
+			T->ER_firstChild = c->ER_firstChild;
+			T->to_firstChild = c->to_firstChild;
+			ER_t *t = T->to_firstChild;
+			while(t) {
+				t->ER_parent = T->ER_id;
+				t->to_parent = T;
+				t = t->to_nextSibling;
+			}
+			printff("[%d] link %d to its new child %d\n",a,T->ER_id,c->ER_firstChild);
+			printff("[%d] return %d \n",a,T->ER_id);
 
 			return T; // T is better
 		} else {
@@ -175,7 +233,6 @@ ER_t *linear_reduction(ER_t *T)
 		while (c) {
 			printff("[%d] %d go linear reduction \n",a,c->ER_id);
 
-			//G_td.featraw[c->ER_id].HC_vec = (int *)malloc(G_td.img->rows*sizeof(int));
 			ER_t *d = linear_reduction(c);
 
 			printff("[%d] %d returned from linear reduction \n",a,d->ER_id);
@@ -227,8 +284,10 @@ void get_ER_candidates(void)
 {
 	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
 
-
-
+	int no_union = 0;
+	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
+	tree_accumulation(&G_td.ERs[G_td.ER_no-1], &no_union, ER_union);
+	free(ER_union);
 }
 
 
@@ -299,6 +358,7 @@ void main_sample_2(void)
 int main_sample_1(void) 
 {
 	// get image
+#if 0
 	int img_cols = 4;
 	int img_rows = 4;
 	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
@@ -307,6 +367,15 @@ int main_sample_1(void)
 	img_ptr[4] =  2; img_ptr[5] =  2; img_ptr[6] =  3; img_ptr[7] =  2;
 	img_ptr[8] =  3; img_ptr[9] =  3; img_ptr[10] = 3; img_ptr[11] = 2;
 	img_ptr[12] = 1; img_ptr[13] = 2; img_ptr[14] = 3; img_ptr[15] = 4;
+#else
+	int img_cols = 5;
+	int img_rows = 3;
+	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
+	u8* img_ptr = img_data;
+	img_ptr[0] = 109; img_ptr[1] =  58; img_ptr[2] =  34; img_ptr[3] = 144; img_ptr[4] =  66;
+	img_ptr[5] = 205; img_ptr[6] = 205; img_ptr[7] = 205; img_ptr[8] = 132; img_ptr[9] = 181;
+	img_ptr[10]= 159; img_ptr[11]= 172; img_ptr[12]= 108; img_ptr[13]= 205; img_ptr[14]= 205;
+#endif
 	Mat img;
 	img.rows = img_rows;
 	img.cols = img_cols;
