@@ -6,6 +6,9 @@
 #include <opencv2/core/core.hpp>
 using namespace cv;
 
+#define INVALID_ER(v)	(v->size=0xDEADBEEF)
+#define ISVALID_ER(v)	(v->size==0xDEADBEEF)
+
 typedef struct featraw_t
 {
 	/* public used */
@@ -16,14 +19,29 @@ typedef struct featraw_t
 	int *HC_buf;	// buf addr backup for memory relase
 } featraw_t;
 
+typedef struct rules_t
+{
+	int min_size;// = 30;
+	double min_w_reg2img_ratio;// = 0.0019;
+	double max_w_reg2img_ratio;// = 0.4562;
+	double min_h_reg2img_ratio;// = 0.0100;
+	double max_h_reg2img_ratio;// = 0.7989;
+} rules_t;
+
 // Global variable structure
 typedef struct G_textdetect_t
 {
 	Mat *img;            // current image
 	ER_t *ERs;           // ERs
 	int ER_no;           // ER no
+	int ER_no_rest;      // ER no rest
 	LinkedPoint *pts;    // points
 	featraw_t *featraw;  // raw feature for each ER
+	rules_t r;           // rule constants
+
+	bool (*lr_algo)(ER_t *, ER_t *);       // linear-reduction algo
+	bool (*ta_algo)(ER_t *, int, ER_t **); // tree-accumulation algo
+
 } G_textdetect_t;
 
 extern G_textdetect_t G_td;

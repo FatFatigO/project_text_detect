@@ -73,13 +73,13 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
 
 	// perimeter
-	get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
+	//get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
 
 	// euler no
-	get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
+	//get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
 
 	// horizontal crossig
-	get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
+	//get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
 
 	printff("[%d] val %d size %d\n out feature : \n BB:%d,%d,%d,%d\n PR:%d\n EN:%d\n HC:%d,%d,%d,%d\n", 
 		feat_id_to, G_td.ERs[feat_id_to].ER_val, G_td.ERs[feat_id_to].ER_size,
@@ -96,6 +96,57 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 		free(feat_fr_HC);
 	}
 }
+
+
+bool linear_reduction_algo_1(ER_t *T, ER_t *c)
+{
+	// return true: T is better
+	// return false: c is better
+	p4_t *s = &G_td.featraw[c->ER_id].BB;
+	if (c->ER_size < G_td.r.min_size) {
+		printf("%d\n",c->ER_size);
+		return true;
+	} else if ((((s->val[2] - s->val[0] + 1) / G_td.img->cols) < G_td.r.min_w_reg2img_ratio) ||
+			   (((s->val[2] - s->val[0] + 1) / G_td.img->cols) > G_td.r.max_w_reg2img_ratio) ||
+			   (((s->val[3] - s->val[1] + 1) / G_td.img->rows) < G_td.r.min_h_reg2img_ratio) ||
+			   (((s->val[3] - s->val[1] + 1) / G_td.img->rows) > G_td.r.max_h_reg2img_ratio))
+		return true;
+	else if (((T->to_parent->ER_size - T->ER_size) / T->ER_size) <
+		     ((c->to_parent->ER_size - c->ER_size) / c->ER_size))
+		return true;
+	else
+		return false;
+}
+bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_t **C)
+{
+	//if var[T] <= min-var[C] then
+	// return true: T is better
+	// return false: c is better
+	int min_var_C = 100000;
+	for (int i=0; i<C_no; i++) {
+		float var_c = (C[i]->to_parent->ER_size - C[i]->ER_size) / C[i]->ER_size;
+		if (var_c < min_var_C)
+			min_var_C = var_c;
+	}
+	if ((T->to_parent) && (((T->to_parent->ER_size - T->ER_size) / T->ER_size) <= min_var_C))
+		return true;
+	else
+		return false;
+}
+
+
+bool linear_reduction_algo(ER_t *T, ER_t *c)
+{
+	//(T->ER_val<c->ER_val)
+	return true;
+}
+bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
+{
+	//if var[T] <= min-var[C] then
+	return false;//true;
+}
+
+
 
 
 /*
@@ -117,12 +168,6 @@ procedure TREE-ACCUMULATION(T)
 end procedure
 */
 
-bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
-{
-	//if var[T] <= min-var[C] then
-	return true;
-}
-
 void tree_accumulation(ER_t *T, int *out_no, ER_t **out)
 {
 	if (T->ER_firstChild ==-1) {
@@ -137,7 +182,7 @@ void tree_accumulation(ER_t *T, int *out_no, ER_t **out)
 			tree_accumulation(c, out_no, out);
 			c = c->to_nextSibling;
 		}
-		if (tree_accumulation_algo(T, *out_no, out)) {
+		if (G_td.ta_algo(T, *out_no, out)) {
 			//discard-children(T)
 			T->ER_firstChild = -1;
 			T->to_firstChild = NULL;
@@ -176,12 +221,6 @@ procedure LINEAR-REDUCTION(T)
 end procedure
 */
 
-bool linear_reduction_algo(ER_t *T, ER_t *c)
-{
-	//(T->ER_val<c->ER_val)
-	return true;
-}
-
 ER_t *linear_reduction(ER_t *T)
 {
 	int a = T->ER_id;
@@ -193,15 +232,17 @@ ER_t *linear_reduction(ER_t *T)
 		// <====== Feature extraction (in/crementally computed from Null => T)
 		calc_incremental_feature_multi(0, NULL, T->ER_id);
 		/* ----------------------------- END ----------------------------------*/
-
+		if ((T->ER_size < G_td.r.min_size) && (!(T->to_nextSibling) && !(T->to_prevSibling)))
+			T = T;
 		return T;
 	} else if (T->to_firstChild->ER_nextSibling==-1) {
 		// has only one child
+		G_td.ER_no_rest--;
 		printff("[%d] %d has one child\n",a,T->ER_id);
 		printff("[%d] %d go linear reduction \n",a,T->to_firstChild->ER_id);
 		ER_t *c = linear_reduction(T->to_firstChild);
 		printff("[%d] %d returned from linear reduction \n",a,c->ER_id);
-		if (linear_reduction_algo(T,c)){       // put selection algo here
+		if (G_td.lr_algo(T,c)){       // put selection algo here
 			/* ---------------------------- START ---------------------------------*/
 			// Feature extraction (incrementally computed from T->firstChild => T)
 			int *fr_id = &T->to_firstChild->ER_id;
@@ -280,13 +321,76 @@ ER_t *linear_reduction(ER_t *T)
 	}
 }
 
+void tree_remove_small_ER(ER_t *v)
+{
+	ER_t *d = v->to_firstChild;
+	while (d) {
+		tree_remove_small_ER(d);
+		ER_t *c = d;
+		d = d->to_nextSibling;
+
+		//visit each ER;
+		if (c->ER_size < G_td.r.min_size) {
+			// remove node c
+			// (1) parent related
+			if (c->to_parent) {
+				if (c->to_parent->ER_firstChild==c->ER_id) {
+					if (c->to_nextSibling) {
+						c->to_parent->ER_firstChild = c->ER_nextSibling;
+						c->to_parent->to_firstChild = c->to_nextSibling;
+					} else {
+						c->to_parent->ER_firstChild = -1;
+						c->to_parent->to_firstChild = NULL;
+					}
+				}
+				c->ER_parent = -1;
+				c->to_parent = NULL;
+			}
+			// (2) sibling related
+			if (c->to_nextSibling) {
+				c->to_nextSibling->ER_prevSibling = -1;
+				c->to_nextSibling->to_prevSibling = NULL;
+				c->ER_nextSibling = -1;
+				c->to_nextSibling = NULL;
+			}
+			if (c->to_prevSibling) {
+				c->to_prevSibling->ER_nextSibling = -1;
+				c->to_prevSibling->to_nextSibling = NULL;
+				c->ER_prevSibling = -1;
+				c->to_prevSibling = NULL;
+			}
+			// (3) child related
+			if (c->ER_firstChild ==-1) {
+				// has no child
+			} else if (c->to_firstChild->ER_nextSibling==-1) {
+				// has only one child
+			} else {
+				// has more than two children
+			}
+			// (4) invalid ER
+			INVALID_ER(c);
+			G_td.ER_no_rest--;
+		}
+	}
+}
+
 void get_ER_candidates(void)
 {
-	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
+	G_td.ER_no_rest = G_td.ER_no;
+	printf("ER rest : %d\n", G_td.ER_no_rest);
+	tree_remove_small_ER(&G_td.ERs[G_td.ER_no-1]);
 
+	G_td.lr_algo = linear_reduction_algo_1;
+	printf("ER rest : %d\n", G_td.ER_no_rest);
+	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
+	
 	int no_union = 0;
 	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
+	printf("ER rest : %d\n", G_td.ER_no_rest);
+	G_td.ta_algo = tree_accumulation_algo_1;
 	tree_accumulation(&G_td.ERs[G_td.ER_no-1], &no_union, ER_union);
+	printf("ER rest : %d\n", no_union);
+
 	free(ER_union);
 }
 
@@ -310,14 +414,15 @@ void main_sample_2(void)
 		if (0) {
 			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
 		} else {
-			double percent = 25;
-			IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+			double percent = 5;
+			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+			IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100) , (int)((src->height*percent)/100) ), src->depth, src->nChannels);
 			cvResize(src, dst, CV_INTER_LINEAR);
 			img = dst;
-			//cvNamedWindow("a");
-			//cvShowImage("a", dst);
-			//cvWaitKey(0);
+			cvNamedWindow("a");
+			cvShowImage("a", dst);
+			cvWaitKey(0);
 		}
 		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
 
@@ -410,6 +515,8 @@ int main_sample_1(void)
 
 int main(void)
 {
+	rules_t rules = {30, 0.0019, 0.4562, 0.0100, 0.7989};
+	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
 	main_sample_2();
 #if 0
