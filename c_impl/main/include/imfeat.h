@@ -44,6 +44,10 @@ typedef struct ER_t
 	struct ER_t* to_prevSibling;
 	LinkedPoint* ER_head;
 	LinkedPoint* ER_tail;
+	int l;
+	int t;
+	int r;
+	int b;
 
 	/* free to use after get_ERs */
 	int val;

@@ -31,7 +31,7 @@ void get_BoundingBox(IN p8_t *pt, IN p4_t *feat_in, OUT p4_t *feat_out)
 		}
 	}
 
-	// proprocess: label pixel
+	// preprocess: label pixel
 	imfeat_util_label_pixels(1, pt);
 
 	// calc bounding box

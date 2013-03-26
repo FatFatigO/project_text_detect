@@ -14,11 +14,24 @@
 #include <opencv2/imgproc/imgproc.hpp>
 using namespace cv;
 
-#define debug_print if(debug)printf //printf
+#define debug_print if(G_imf_er.debug)printf //printf
 #define cor2idx(x,y,w)	(x+(y)*(w))
 typedef unsigned char u8;
 typedef unsigned short int u16;
 typedef unsigned long int u32;
+
+typedef struct MSERConnectedComp;
+typedef struct G_imf_ER_t
+{
+	int debug;
+	int img_rows;
+	int img_cols;
+	int pt_order;
+	ER_t *hist_start;
+	MSERConnectedComp *cmp_start;
+} G_imf_ER_t;
+static G_imf_ER_t G_imf_er;
+
 
 typedef struct MSERConnectedComp
 {
@@ -29,6 +42,10 @@ typedef struct MSERConnectedComp
 	int size;
 	int dvar; // the derivative of last var
 	float var; // the current variation (most time is the variation of one-step back)
+	int l;
+	int t;
+	int r;
+	int b;
 }
 MSERConnectedComp;
 
@@ -43,33 +60,36 @@ initMSERComp( MSERConnectedComp* comp )
 }
 
 // add a pixel to the pixel list
-static int pt_order = 0;
 static void accumulateMSERComp( MSERConnectedComp* comp, LinkedPoint* point )
 {
-	point->pt_order = pt_order;
-	pt_order ++;
+	point->pt_order = G_imf_er.pt_order;
+	G_imf_er.pt_order ++;
 	if ( comp->size > 0 )
 	{
 		point->prev = comp->tail;
 		comp->tail->next = point;
 		point->next = NULL;
+		comp->l = MIN(comp->l, point->pt.x);
+		comp->t = MIN(comp->t, point->pt.y);
+		comp->r = MAX(comp->r, point->pt.x);
+		comp->b = MAX(comp->b, point->pt.y);
 	} else {
 		point->prev = NULL;
 		point->next = NULL;
 		comp->head = point;
+		comp->l = comp->r = point->pt.x;
+		comp->t = comp->b = point->pt.y;
 	}
 	comp->tail = point;
 	comp->size++;
 }
 
 // *******************************************************************
-static int debug = 0;
-static ER_t* hist_start; //kevin added
 // add history of size to a connected component
 static void
 MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 {
-	history->ER_id = (history-hist_start);
+	history->ER_id = (history-G_imf_er.hist_start);
 	// child of last history is itself
 	//history->child = history; //kevin marked
 	// comp->history always link to previous created history
@@ -88,13 +108,14 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 			history->ER_firstChild = comp->history->ER_id;
 			history->to_firstChild = comp->history;
 		}
-		comp->history->ER_parent = history->ER_id;
-		comp->history->to_parent = history;
-
 		// when new a hist, check if comp's hist has sibling, if yes, assign same parent to all sibling 
-		ER_t* cur = comp->history->to_nextSibling;
+		ER_t* cur = comp->history;
 		while ( cur )
 		{
+			comp->l = MIN(comp->l, cur->l);
+			comp->t = MIN(comp->t, cur->t);
+			comp->r = MAX(comp->r, cur->r);
+			comp->b = MAX(comp->b, cur->b);
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
 			cur = cur->to_nextSibling;
@@ -109,10 +130,14 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 	history->ER_size = comp->size;      //kevin added
 	history->ER_head = comp->head;      //kevin added
 	history->ER_tail = comp->tail;      //kevin added
+	history->l = comp->l;
+	history->t = comp->t;
+	history->r = comp->r;
+	history->b = comp->b;
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) in MSERNewHistory <========== \n", 
-		history-hist_start, history->val, history->size, history->ER_val, history->ER_size);
+		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size);
 }
-static MSERConnectedComp* cmp_start; //kevin added
+
 // merging two connected component
 static void
 MSERMergeComp( MSERConnectedComp* comp1,
@@ -123,9 +148,9 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	LinkedPoint* head;
 	LinkedPoint* tail;
 	comp->grey_level = comp2->grey_level;
-	debug_print("update cmp %d grey_level %d in MSERMergeComp \n", comp-cmp_start, comp->grey_level);
+	debug_print("update cmp %d grey_level %d in MSERMergeComp \n", comp-G_imf_er.cmp_start, comp->grey_level);
 	//history->child = history; //kevin marked
-	history->ER_id = (history-hist_start);
+	history->ER_id = (history-G_imf_er.hist_start);
 	// select the winner by size
 	if ( comp1->size >= comp2->size )
 	{
@@ -185,6 +210,7 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	history->ER_size = comp1->size;      //kevin added
 	history->ER_head = comp1->head;      //kevin added
 	history->ER_tail = comp1->tail;      //kevin added
+
 	if ( NULL != comp1->history )
 	{
 		if ( -1 == history->ER_firstChild )
@@ -193,13 +219,14 @@ MSERMergeComp( MSERConnectedComp* comp1,
 			history->ER_firstChild = comp1->history->ER_id;
 			history->to_firstChild = comp1->history;
 		} 
-		comp1->history->ER_parent = history->ER_id;
-		comp1->history->to_parent = history;
-
 		// when new a hist, check if comp's hist has sibling, if yes, assign same parent to all sibling 
-		ER_t* cur = comp1->history->to_nextSibling;
+		ER_t* cur = comp1->history;
 		while ( cur )
 		{
+			comp1->l = MIN(comp1->l, cur->l);
+			comp1->t = MIN(comp1->t, cur->t);
+			comp1->r = MAX(comp1->r, cur->r);
+			comp1->b = MAX(comp1->b, cur->b);
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
 			cur = cur->to_nextSibling;
@@ -214,13 +241,21 @@ MSERMergeComp( MSERConnectedComp* comp1,
 		comp2->history->to_prevSibling = history;
 	}
 
+	history->l = comp1->l;
+	history->t = comp1->t;
+	history->r = comp1->r;
+	history->b = comp1->b;
 	comp->head = head;
 	comp->tail = tail;
 	comp->history = history;
 	comp->size = comp1->size + comp2->size;
+	comp->l = history->l;
+	comp->t = history->t;
+	comp->r = history->r;
+	comp->b = history->b;
 
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) comp2_size=%d in MSERMergeComp <========== \n", 
-		history-hist_start, history->val, history->size, history->ER_val, history->ER_size, comp2->size);
+		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size, comp2->size);
 }
 
 // to preprocess src image to following format
@@ -351,8 +386,8 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 	{
 		heap_idx[i] = 0;
 	}
-	cmp_start = comptr+1;
-	hist_start = histptr;
+	G_imf_er.cmp_start = comptr+1;
+	G_imf_er.hist_start = histptr;
 
 	debug_print("[A->B->C->E]\n");
 	debug_print("update cmp-1 grey_level 256 \n");
@@ -400,7 +435,7 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 					comptr++;
 					initMSERComp( comptr );
 					comptr->grey_level = (*imgptr)&0xff;
-					debug_print("create cmp %d grey_level %d \n", (comptr-cmp_start), comptr->grey_level);
+					debug_print("create cmp %d grey_level %d \n", (comptr-G_imf_er.cmp_start), comptr->grey_level);
 					continue;
 				} else {
 					debug_print("[F->G->E]\n");
@@ -424,7 +459,7 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 		memcpy(&ptsmap_ptr[i+step+1], &ptsptr, sizeof(u32));
 		//ptsptr->pt = cvPoint( i&stepmask, i>>stepgap ); // from index i to coordinate (x,y)
 
-		debug_print("put point (%d,%d) %d into cmp %d\n", i&stepmask, i>>stepgap, (*imgptr)&0xff, (comptr-cmp_start));
+		debug_print("put point (%d,%d) %d into cmp %d\n", i&stepmask, i>>stepgap, (*imgptr)&0xff, (comptr-G_imf_er.cmp_start));
 		// get the current location
 		accumulateMSERComp( comptr, ptsptr );
 		ptsptr++;
@@ -470,10 +505,10 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 					debug_print("Yes! \n");
 					debug_print("[M->E]\n");
 					// check the stablity and push a new history, increase the grey level
-					debug_print("create hst %d\n", (histptr-hist_start));
+					debug_print("create hst %d\n", (histptr-G_imf_er.hist_start));
 					MSERNewHistory( comptr, histptr );
 					comptr[0].grey_level = pixel_val;
-					debug_print("update cmp %d grey_level %d \n", (comptr-cmp_start), pixel_val);
+					debug_print("update cmp %d grey_level %d \n", (comptr-G_imf_er.cmp_start), pixel_val);
 					histptr++;
 				} else {
 					debug_print("No! \n");
@@ -494,10 +529,10 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 						if ( pixel_val < comptr[-1].grey_level )
 						{
 							debug_print("[M->E]\n");
-							debug_print("create hst %d\n", (histptr-hist_start));
+							debug_print("create hst %d\n", (histptr-G_imf_er.hist_start));
 							MSERNewHistory( comptr, histptr );
 							comptr[0].grey_level = pixel_val;
-							debug_print("update cmp %d grey_level %d \n", (comptr-cmp_start), pixel_val);
+							debug_print("update cmp %d grey_level %d \n", (comptr-G_imf_er.cmp_start), pixel_val);
 							histptr++;
 							break;
 						}
@@ -509,7 +544,7 @@ static int extractMSER_8UC1_Pass( int* ioptr,
 			}
 		}
 	}
-	return (histptr-hist_start);
+	return (histptr-G_imf_er.hist_start);
 }
 
 int _get_ERs(
@@ -561,8 +596,11 @@ int _get_ERs(
 		ERs[i].to_firstChild = NULL;
 		ERs[i].to_nextSibling = NULL;
 		ERs[i].to_prevSibling = NULL;
+		ERs[i].l = ERs[i].t = ERs[i].r = ERs[i].b = -1;
 	}
-	//MemStorage storage;
+	// assign global variables
+	G_imf_er.img_cols = src->cols;
+	G_imf_er.img_rows = src->rows;
 
 	// darker to brighter (MSER-)
 	int max_val = 0;
@@ -598,6 +636,9 @@ int _get_ERs(
 	}
 	root->ER_head = cur_pt;
 	root->ER_val = max_val;
+	root->l = root->t = 0;
+	root->r = src->cols-1;
+	root->b = src->rows-1;
 	no_ER ++;
 
 	// create dummy pt for boundary case
@@ -643,17 +684,19 @@ int get_ERs(
 			 OUT LinkedPoint *pts)
 {
     // use reverse plus 2 to indicate debug mode 
-    if (reverse>=2) {
-            debug = 1;
-            reverse-=2;
-    }
+	if (reverse>=2) {
+		G_imf_er.debug = 1;
+		reverse-=2;
+	} else {
+		G_imf_er.debug = 0;
+	}
 	struct CvMat img;
 	img.type = 0; //CV_8UC1
 	img.data.ptr = img_data;
 	img.rows = img_rows;
 	img.cols = img_cols;
 	img.step = img_cols;
-	pt_order = 0;
+	G_imf_er.pt_order = 0;
 
 	return _get_ERs(&img, ERs, pts, reverse);
 }
