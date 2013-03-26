@@ -35,6 +35,7 @@ typedef struct ER_t
 	int ER_val;
 	int ER_size;
 	int ER_parent;
+	int ER_noChild;
 	int ER_firstChild;
 	int ER_nextSibling;
 	int ER_prevSibling;

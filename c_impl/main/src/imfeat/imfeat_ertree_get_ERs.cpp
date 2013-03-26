@@ -90,6 +90,7 @@ static void
 MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 {
 	history->ER_id = (history-G_imf_er.hist_start);
+	history->ER_noChild = 0;
 	// child of last history is itself
 	//history->child = history; //kevin marked
 	// comp->history always link to previous created history
@@ -107,11 +108,13 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 			// when new a hist, if comp has hist and cur hist has no child, assign it
 			history->ER_firstChild = comp->history->ER_id;
 			history->to_firstChild = comp->history;
+			history->ER_noChild = 1;
 		}
 		// when new a hist, check if comp's hist has sibling, if yes, assign same parent to all sibling 
 		ER_t* cur = comp->history;
 		while ( cur )
 		{
+			if (cur != comp->history) history->ER_noChild++;
 			comp->l = MIN(comp->l, cur->l);
 			comp->t = MIN(comp->t, cur->t);
 			comp->r = MAX(comp->r, cur->r);
@@ -210,6 +213,7 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	history->ER_size = comp1->size;      //kevin added
 	history->ER_head = comp1->head;      //kevin added
 	history->ER_tail = comp1->tail;      //kevin added
+	history->ER_noChild = 0;
 
 	if ( NULL != comp1->history )
 	{
@@ -218,11 +222,13 @@ MSERMergeComp( MSERConnectedComp* comp1,
 			// when merge, if comp has hist but cur hist has no child, assign it
 			history->ER_firstChild = comp1->history->ER_id;
 			history->to_firstChild = comp1->history;
+			history->ER_noChild = 1;
 		} 
 		// when new a hist, check if comp's hist has sibling, if yes, assign same parent to all sibling 
 		ER_t* cur = comp1->history;
 		while ( cur )
 		{
+			if (cur != comp1->history) history->ER_noChild++;
 			comp1->l = MIN(comp1->l, cur->l);
 			comp1->t = MIN(comp1->t, cur->t);
 			comp1->r = MAX(comp1->r, cur->r);
@@ -620,7 +626,9 @@ int _get_ERs(
 				ER_t* cur = &ERs[i];
 				root->ER_firstChild = i;
 				root->to_firstChild = cur;
+				root->ER_noChild = 1;
 				while (cur) {
+					if (cur != root->to_firstChild) root->ER_noChild++;
 					cur->ER_parent = root->ER_id;
 					cur->to_parent = root;
 					cur = cur->to_nextSibling;

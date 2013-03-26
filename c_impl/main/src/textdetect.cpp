@@ -25,8 +25,36 @@ using namespace cv;
 /* global variable */
 G_textdetect_t G_td;
 
+void calc_incremental_BB(int feat_id_to)
+{
+	// init "from" param
+	p4_t *feat_fr_BB = NULL;
+
+	// init "to" param
+	featraw_t *feat_to = &G_td.featraw[feat_id_to];
+	int pt_to_start_idx = G_td.ERs[feat_id_to].ER_head->pt_order;
+	int pt_to_size = G_td.ERs[feat_id_to].ER_size;
+
+	// init "pt" param
+	p8_t pt;
+	pt.val[0] = (u32)G_td.pts;
+	pt.val[1] = G_td.img->rows;
+	pt.val[2] = G_td.img->cols;
+	pt.val[3] = 0;
+	pt.val[4] = NULL;
+	pt.val[5] = NULL;
+	pt.val[6] = pt_to_start_idx;
+	pt.val[7] = pt_to_size;
+
+	// bounding box
+	get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
+}
+
+
 void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 {
+	return; ///////////////////////////
+
 	// init "from" param
 	int *pt_fr_start_idx = NULL, *pt_fr_size = NULL;
 	p4_t *feat_fr_BB = NULL;
@@ -73,13 +101,13 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
 
 	// perimeter
-	//get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
+	get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
 
 	// euler no
-	//get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
+	get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
 
 	// horizontal crossig
-	//get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
+	get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
 
 	printff("[%d] val %d size %d\n out feature : \n BB:%d,%d,%d,%d\n PR:%d\n EN:%d\n HC:%d,%d,%d,%d\n", 
 		feat_id_to, G_td.ERs[feat_id_to].ER_val, G_td.ERs[feat_id_to].ER_size,
@@ -97,22 +125,20 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	}
 }
 
-
 bool linear_reduction_algo_1(ER_t *T, ER_t *c)
 {
 	// return true: T is better
 	// return false: c is better
-	p4_t *s = &G_td.featraw[c->ER_id].BB;
 	if (c->ER_size < G_td.r.min_size) {
-		printf("%d\n",c->ER_size);
 		return true;
-	} else if ((((s->val[2] - s->val[0] + 1) / G_td.img->cols) < G_td.r.min_w_reg2img_ratio) ||
-			   (((s->val[2] - s->val[0] + 1) / G_td.img->cols) > G_td.r.max_w_reg2img_ratio) ||
-			   (((s->val[3] - s->val[1] + 1) / G_td.img->rows) < G_td.r.min_h_reg2img_ratio) ||
-			   (((s->val[3] - s->val[1] + 1) / G_td.img->rows) > G_td.r.max_h_reg2img_ratio))
+	} else if ((((c->r - c->l + 1)*1.0 / G_td.img->cols) < G_td.r.min_w_reg2img_ratio) ||
+			   (((c->b - c->t + 1)*1.0 / G_td.img->rows) < G_td.r.min_h_reg2img_ratio)) {
+		return true;	   
+	} else if ((((c->r - c->l + 1)*1.0 / G_td.img->cols) > G_td.r.max_w_reg2img_ratio) ||
+			   (((c->b - c->t + 1)*1.0 / G_td.img->rows) > G_td.r.max_h_reg2img_ratio)) {
 		return true;
-	else if (((T->to_parent->ER_size - T->ER_size) / T->ER_size) <
-		     ((c->to_parent->ER_size - c->ER_size) / c->ER_size))
+	} else if (((T->to_parent->ER_size - T->ER_size)*1.0 / T->ER_size) <
+		       ((c->to_parent->ER_size - c->ER_size)*1.0 / c->ER_size))
 		return true;
 	else
 		return false;
@@ -122,13 +148,13 @@ bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_t **C)
 	//if var[T] <= min-var[C] then
 	// return true: T is better
 	// return false: c is better
-	int min_var_C = 100000;
+	int min_var_C = 10000000;
 	for (int i=0; i<C_no; i++) {
-		float var_c = (C[i]->to_parent->ER_size - C[i]->ER_size) / C[i]->ER_size;
+		float var_c = (C[i]->to_parent->ER_size - C[i]->ER_size)*1.0 / C[i]->ER_size;
 		if (var_c < min_var_C)
 			min_var_C = var_c;
 	}
-	if ((T->to_parent) && (((T->to_parent->ER_size - T->ER_size) / T->ER_size) <= min_var_C))
+	if ((T->to_parent) && (((T->to_parent->ER_size - T->ER_size)*1.0 / T->ER_size) <= min_var_C))
 		return true;
 	else
 		return false;
@@ -145,9 +171,6 @@ bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
 	//if var[T] <= min-var[C] then
 	return false;//true;
 }
-
-
-
 
 /*
 procedure TREE-ACCUMULATION(T)
@@ -170,12 +193,12 @@ end procedure
 
 void tree_accumulation(ER_t *T, int *out_no, ER_t **out)
 {
-	if (T->ER_firstChild ==-1) {
+	if (T->ER_noChild == 0) {
 		// has no child
 		out[*out_no] = T;
 		*out_no += 1;
 		return;
-	} else if (T->to_firstChild->ER_nextSibling!=-1) {
+	} else if (T->ER_noChild >= 2) {
 		// has more than two children
 		ER_t *c = T->to_firstChild;
 		while (c) {
@@ -224,7 +247,7 @@ end procedure
 ER_t *linear_reduction(ER_t *T)
 {
 	int a = T->ER_id;
-	if (T->ER_firstChild ==-1) {
+	if (T->ER_noChild == 0) {
 		// has no child
 		printff("[%d] has no child, return %d\n",a,T->ER_id);
 
@@ -235,14 +258,14 @@ ER_t *linear_reduction(ER_t *T)
 		if ((T->ER_size < G_td.r.min_size) && (!(T->to_nextSibling) && !(T->to_prevSibling)))
 			T = T;
 		return T;
-	} else if (T->to_firstChild->ER_nextSibling==-1) {
+	} else if (T->ER_noChild == 1) {
 		// has only one child
 		G_td.ER_no_rest--;
 		printff("[%d] %d has one child\n",a,T->ER_id);
 		printff("[%d] %d go linear reduction \n",a,T->to_firstChild->ER_id);
 		ER_t *c = linear_reduction(T->to_firstChild);
 		printff("[%d] %d returned from linear reduction \n",a,c->ER_id);
-		if (G_td.lr_algo(T,c)){       // put selection algo here
+		if (G_td.lr_algo(T,c)){
 			/* ---------------------------- START ---------------------------------*/
 			// Feature extraction (incrementally computed from T->firstChild => T)
 			int *fr_id = &T->to_firstChild->ER_id;
@@ -321,16 +344,18 @@ ER_t *linear_reduction(ER_t *T)
 	}
 }
 
-void tree_remove_small_ER(ER_t *v)
+void tree_remove_extreme_size_ER(ER_t *v)
 {
 	ER_t *d = v->to_firstChild;
 	while (d) {
-		tree_remove_small_ER(d);
+		tree_remove_extreme_size_ER(d);
 		ER_t *c = d;
 		d = d->to_nextSibling;
 
 		//visit each ER;
-		if (c->ER_size < G_td.r.min_size) {
+		if ((c->ER_size < G_td.r.min_size) ||
+			(((c->r - c->l + 1)*1.0 / G_td.img->cols) < G_td.r.min_w_reg2img_ratio) ||
+			(((c->b - c->t + 1)*1.0 / G_td.img->rows) < G_td.r.min_h_reg2img_ratio)) {
 			// remove node c
 			// (1) parent related
 			if (c->to_parent) {
@@ -360,13 +385,14 @@ void tree_remove_small_ER(ER_t *v)
 				c->to_prevSibling = NULL;
 			}
 			// (3) child related
-			if (c->ER_firstChild ==-1) {
+			if (c->ER_noChild == 0) {
 				// has no child
-			} else if (c->to_firstChild->ER_nextSibling==-1) {
+			} else if (c->ER_noChild == 1) {
 				// has only one child
 			} else {
 				// has more than two children
 			}
+			c->ER_noChild = 0;
 			// (4) invalid ER
 			INVALID_ER(c);
 			G_td.ER_no_rest--;
@@ -374,23 +400,42 @@ void tree_remove_small_ER(ER_t *v)
 	}
 }
 
+
 void get_ER_candidates(void)
 {
 	G_td.ER_no_rest = G_td.ER_no;
-	printf("ER rest : %d\n", G_td.ER_no_rest);
-	tree_remove_small_ER(&G_td.ERs[G_td.ER_no-1]);
+	printf("[original] ER rest : %d\n", G_td.ER_no_rest);
+	tree_remove_extreme_size_ER(&G_td.ERs[G_td.ER_no-1]);
 
 	G_td.lr_algo = linear_reduction_algo_1;
-	printf("ER rest : %d\n", G_td.ER_no_rest);
+	printf("[rm_extrm] ER rest : %d\n", G_td.ER_no_rest);
 	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
 	
 	int no_union = 0;
 	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
-	printf("ER rest : %d\n", G_td.ER_no_rest);
+	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
 	G_td.ta_algo = tree_accumulation_algo_1;
 	tree_accumulation(&G_td.ERs[G_td.ER_no-1], &no_union, ER_union);
-	printf("ER rest : %d\n", no_union);
+	printf("[tr_accum] ER rest : %d\n", no_union);
 
+#if 1
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*G_td.img->cols*sizeof(u8)); 
+	for (int i=0; i<no_union; i++) {
+		memset(img_data, 0, G_td.img->rows*G_td.img->cols*sizeof(u8));
+		LinkedPoint *cur = ER_union[i]->ER_head;
+		for (int j=0; j<ER_union[i]->ER_size; j++) {
+			img_data[cur->pt.y*G_td.img->cols+cur->pt.x] = 255;
+			cur = cur->next;
+		}
+		CvSize size = {G_td.img->cols, G_td.img->rows};
+		IplImage *dst = cvCreateImage(size, 8, 1);
+		dst->imageData = (char *)img_data;
+		cvNamedWindow("a");
+		cvShowImage("a", dst);
+		cvWaitKey(0);
+	}
+	free(img_data);
+#endif
 	free(ER_union);
 }
 
@@ -414,15 +459,15 @@ void main_sample_2(void)
 		if (0) {
 			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
 		} else {
-			double percent = 5;
+			double percent = 25;
 			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100) , (int)((src->height*percent)/100) ), src->depth, src->nChannels);
 			cvResize(src, dst, CV_INTER_LINEAR);
 			img = dst;
-			cvNamedWindow("a");
-			cvShowImage("a", dst);
-			cvWaitKey(0);
+			//cvNamedWindow("a");
+			//cvShowImage("a", dst);
+			//cvWaitKey(0);
 		}
 		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
 
@@ -515,10 +560,10 @@ int main_sample_1(void)
 
 int main(void)
 {
-	rules_t rules = {30, 0.0019, 0.4562, 0.0100, 0.7989};
+	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
-	main_sample_2();
+	main_sample_1();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;
