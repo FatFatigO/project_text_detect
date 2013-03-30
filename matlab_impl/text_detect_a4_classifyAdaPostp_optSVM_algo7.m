@@ -140,7 +140,7 @@ if isempty(dir([chk_img_path '*']))
                         if t==232 && r==59
                            t = t; 
                         end
-                        if 0
+                        if 1
                             feat_vec = ft_ert.feat_raw.tree{t,r}.feat_vec;
                         else
                             % crop to fit the boundary

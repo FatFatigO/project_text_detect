@@ -65,23 +65,27 @@ if stage<=4
     end
 else
     
-%     if order(1)=='F' && order(5)=='P'
-%         seq = max(round(ds_eng.no*str2double(order(2:4))/100),1):1:ds_eng.no;
-%     end
-%     if order(1)=='B' && order(5)=='P'
-%         seq = min(round(ds_eng.no*str2double(order(2:4))/100),ds_eng.no):-1:1;
-%     end
-%     if order(1)=='F' && order(5)=='N'
-%         seq = str2double(order(2:4)):1:ds_eng.no;
-%     end
-%     if order(1)=='B' && order(5)=='N'
-%         seq = str2double(order(2:4)):-1:1;
-%     end
-    seq = [6 7 9 19 34 37 55 63 76 78 88 89 98 129 131 139 141 142 149 151 152 153 159 165 190];
-    seq = [1 4 12 26 41 71];
-    seq = [100 111 114 124 125 132 187];
-    for i=seq(order:end)
+    if order(1)=='F' && order(5)=='P'
+        seq = max(round(ds_eng.no*str2double(order(2:4))/100),1):1:ds_eng.no;
+    end
+    if order(1)=='B' && order(5)=='P'
+        seq = min(round(ds_eng.no*str2double(order(2:4))/100),ds_eng.no):-1:1;
+    end
+    if order(1)=='F' && order(5)=='N'
+        seq = str2double(order(2:4)):1:ds_eng.no;
+    end
+    if order(1)=='B' && order(5)=='N'
+        seq = str2double(order(2:4)):-1:1;
+    end
+%     seq = [6 7 9 19 34 37 55 63 76 78 88 89 98 129 131 139 141 142 149 151 152 153 159 165 190];
+%     seq = [1 4 12 26 41 71];
+%     seq = [100 111 114 124 125 132 187];
 
+    for i=seq
+%     for i=seq(order:end)
+%     for i=1:ds_eng.no
+%     for i=ds_eng.no:-1:1
+        
         TEST_IMG_FOLDER = util_changeFn(ds_eng.fn_list{i}, 'remove_filename_and_extension', '');
         TEST_IMG_FILENAME = util_changeFn(ds_eng.fn_list{i}, 'get_filename_and_extension', '');
         TEST_IMG_RESIZE = [400,400];

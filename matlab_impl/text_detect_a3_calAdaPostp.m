@@ -32,11 +32,12 @@ ft_ert.ft_pool = [0 0 0 0 0];
 % path = util_changeFn(path,'cd _mkdir','Output_img');
 % path = util_changeFn(path,'cd _mkdir','Parsed_mat');
 % path = util_changeFn(path,'cd _mkdir',ds);
-path = '../../../../KCD_NoSync/temp1/MSRATD500/400x400/';
+path = '../../../../../LargeFiles/Adaboost_post/MSRATD500/400x400/';
+path_token = '../../_output_files/Token/[01]_0328_create_400x400_result/';
 for reverse = 0:1
     
     % if it's parsed, jump to next
-    chk_txt = [path '[' sprintf('%03d',img_idx) '] ' fn '_' num2str(resize(1)) 'x' num2str(resize(2)) '_reverse_' num2str(reverse) '.txt'];
+    chk_txt = [path_token '[' sprintf('%03d',img_idx) '] ' fn '_' num2str(resize(1)) 'x' num2str(resize(2)) '_reverse_' num2str(reverse) '.txt'];
     if exist(chk_txt, 'file')
         continue;
     else

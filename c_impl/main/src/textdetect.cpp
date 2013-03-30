@@ -405,12 +405,14 @@ void get_ER_candidates(void)
 {
 	G_td.ER_no_rest = G_td.ER_no;
 	printf("[original] ER rest : %d\n", G_td.ER_no_rest);
-	tree_remove_extreme_size_ER(&G_td.ERs[G_td.ER_no-1]);
+	//tree_remove_extreme_size_ER(&G_td.ERs[G_td.ER_no-1]);
 
-	G_td.lr_algo = linear_reduction_algo_1;
-	printf("[rm_extrm] ER rest : %d\n", G_td.ER_no_rest);
+	//G_td.lr_algo = linear_reduction_algo_1;
+	G_td.lr_algo = linear_reduction_algo;
+	//printf("[rm_extrm] ER rest : %d\n", G_td.ER_no_rest);
 	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
 	
+	/*
 	int no_union = 0;
 	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
 	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
@@ -437,6 +439,7 @@ void get_ER_candidates(void)
 	free(img_data);
 #endif
 	free(ER_union);
+	*/
 }
 
 
@@ -459,17 +462,17 @@ void main_sample_2(void)
 		if (0) {
 			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
 		} else {
-			double percent = 25;
-			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-			IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
-			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100) , (int)((src->height*percent)/100) ), src->depth, src->nChannels);
+			double percent = 50;
+			IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+			//IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
+			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100), (int)((src->height*percent)/100) ), src->depth, src->nChannels);
 			cvResize(src, dst, CV_INTER_LINEAR);
 			img = dst;
 			//cvNamedWindow("a");
 			//cvShowImage("a", dst);
 			//cvWaitKey(0);
 		}
-		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
+		printf("Time taken: %.2fs (size %d x %d)\n", (double)(clock() - tStart)/CLOCKS_PER_SEC, img.cols, img.rows); tStart = clock();
 
 		// get ERs
 		ER_t *ERs = (ER_t *)malloc(img.rows*img.cols*sizeof(ERs[0]));
