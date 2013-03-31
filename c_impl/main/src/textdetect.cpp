@@ -566,7 +566,7 @@ int main(void)
 	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
-	main_sample_1();
+	main_sample_2();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;

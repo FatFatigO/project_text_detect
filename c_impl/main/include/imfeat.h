@@ -45,10 +45,11 @@ typedef struct ER_t
 	struct ER_t* to_prevSibling;
 	LinkedPoint* ER_head;
 	LinkedPoint* ER_tail;
-	int l;
-	int t;
-	int r;
-	int b;
+	int l; // boundingbox left
+	int t; // boundingbox top
+	int r; // boundingbox right
+	int b; // boundingbox bottom
+	int p; // perimeter
 
 	/* free to use after get_ERs */
 	int val;
