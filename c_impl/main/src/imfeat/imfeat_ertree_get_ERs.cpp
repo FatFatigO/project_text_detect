@@ -48,7 +48,9 @@ typedef struct MSERConnectedComp
 	int r;
 	int b;
 	int p;     // perimeter
-	int p_raw; // perimeter raw data
+	int p_dif; // perimeter difference
+	int eu;    // euler no
+	int eu_dif;// euler no difference
 }
 MSERConnectedComp;
 
@@ -83,7 +85,34 @@ static void accumulateMSERComp( MSERConnectedComp* comp, LinkedPoint* point )
 		if (G_imf_er.ptsmap[cor2idx(point->pt.x+1, point->pt.y+2, G_imf_er.img_cols+2)]) q = q + 1;//b
 		if (G_imf_er.ptsmap[cor2idx(point->pt.x,   point->pt.y+1, G_imf_er.img_cols+2)]) q = q + 1;//l
 		if (G_imf_er.ptsmap[cor2idx(point->pt.x+1, point->pt.y  , G_imf_er.img_cols+2)]) q = q + 1;//t
-		comp->p_raw = q;
+		comp->p_dif = 4 - 2*q;
+		// calc euler no
+		int q1 = 0, q3 = 0, qd = 0;
+		int ori_lt = G_imf_er.ptsmap[cor2idx(point->pt.x  , point->pt.y  , G_imf_er.img_cols+2)];
+		int ori_ct = G_imf_er.ptsmap[cor2idx(point->pt.x+1, point->pt.y  , G_imf_er.img_cols+2)];
+		int ori_rt = G_imf_er.ptsmap[cor2idx(point->pt.x+2, point->pt.y  , G_imf_er.img_cols+2)];
+		int ori_lc = G_imf_er.ptsmap[cor2idx(point->pt.x  , point->pt.y+1, G_imf_er.img_cols+2)];
+		int ori_rc = G_imf_er.ptsmap[cor2idx(point->pt.x+2, point->pt.y+1, G_imf_er.img_cols+2)];
+		int ori_lb = G_imf_er.ptsmap[cor2idx(point->pt.x  , point->pt.y+2, G_imf_er.img_cols+2)];
+		int ori_cb = G_imf_er.ptsmap[cor2idx(point->pt.x+1, point->pt.y+2, G_imf_er.img_cols+2)];
+		int ori_rb = G_imf_er.ptsmap[cor2idx(point->pt.x+2, point->pt.y+2, G_imf_er.img_cols+2)];
+		int ori_sum_lt_block = (ori_lt + ori_lc + ori_ct);
+		int ori_sum_rt_block = (ori_rt + ori_rc + ori_ct);
+		int ori_sum_lb_block = (ori_lb + ori_lc + ori_cb);
+		int ori_sum_rb_block = (ori_rb + ori_rc + ori_cb);
+		int acu_sum_lt_block = ori_sum_lt_block + 1;
+		int acu_sum_rt_block = ori_sum_rt_block + 1;
+		int acu_sum_lb_block = ori_sum_lb_block + 1;
+		int acu_sum_rb_block = ori_sum_rb_block + 1;
+		q1 =  (acu_sum_lt_block==1) + (acu_sum_rt_block==1) + (acu_sum_lb_block==1) + (acu_sum_rb_block==1)
+			- (ori_sum_lt_block==1) - (ori_sum_rt_block==1) - (ori_sum_lb_block==1) - (ori_sum_rb_block==1);
+		q3 =  (acu_sum_lt_block==3) + (acu_sum_rt_block==3) + (acu_sum_lb_block==3) + (acu_sum_rb_block==3)
+			- (ori_sum_lt_block==3) - (ori_sum_rt_block==3) - (ori_sum_lb_block==3) - (ori_sum_rb_block==3);
+		qd =  ((acu_sum_lt_block==2) && (ori_lt==1)) + ((acu_sum_rt_block==2) && (ori_rt==1))
+			+ ((acu_sum_lb_block==2) && (ori_lb==1)) + ((acu_sum_rb_block==2) && (ori_rb==1))
+			- ((ori_sum_lt_block==2) && (ori_lt==0)) - ((ori_sum_rt_block==2) && (ori_rt==0))
+			- ((ori_sum_lb_block==2) && (ori_lb==0)) - ((ori_sum_rb_block==2) && (ori_rb==0));
+		comp->eu_dif = (q1 - q3 + 2*qd) / 4; 
 	} else {
 		point->prev = NULL;
 		point->next = NULL;
@@ -92,8 +121,11 @@ static void accumulateMSERComp( MSERConnectedComp* comp, LinkedPoint* point )
 		comp->l = comp->r = point->pt.x;
 		comp->t = comp->b = point->pt.y;
 		// calc perimeter
-		comp->p_raw = 0;
-		comp->p = 0;
+		comp->p_dif = 0;
+		comp->p = 4;
+		// calc euler no
+		comp->eu_dif = 0;
+		comp->eu = 1;
 	}
 	comp->tail = point;
 	comp->size++;
@@ -116,7 +148,9 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 		//history->stable = 0; //kevin marked
 
 		// calc perimeter
-		comp->p = comp->p + (4 - 2*comp->p_raw);
+		comp->p = comp->p + comp->p_dif;
+		// calc euler no
+		comp->eu = comp->eu + comp->eu_dif;
 	} else {
 		//comp->history->child = history; //kevin marked
 		//history->shortcut = comp->history->shortcut; //kevin marked
@@ -140,9 +174,14 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 			comp->b = MAX(comp->b, cur->b);
 			// calc perimeter
 			if (cur == comp->history)
-				comp->p = comp->p + (4 - 2*comp->p_raw);
+				comp->p = comp->p + comp->p_dif;
 			else
 				comp->p = comp->p + cur->p;
+			// calc euler no
+			if (cur == comp->history)
+				comp->eu = comp->eu + comp->eu_dif;
+			else
+				comp->eu = comp->eu + cur->eu;
 
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
@@ -163,6 +202,7 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 	history->r = comp->r;
 	history->b = comp->b;
 	history->p = comp->p;
+	history->eu = comp->eu;
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) in MSERNewHistory <========== \n", 
 		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size);
 }
@@ -261,9 +301,14 @@ MSERMergeComp( MSERConnectedComp* comp1,
 			comp1->b = MAX(comp1->b, cur->b);
 			// calc perimeter
 			if (cur == comp1->history)
-				comp1->p = comp1->p + (4 - 2*comp1->p_raw);
+				comp1->p = comp1->p + comp1->p_dif;
 			else
 				comp1->p = comp1->p + cur->p;
+			// calc euler no
+			if (cur == comp1->history)
+				comp1->eu = comp1->eu + comp1->eu_dif;
+			else
+				comp1->eu = comp1->eu + cur->eu;
 
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
@@ -271,7 +316,9 @@ MSERMergeComp( MSERConnectedComp* comp1,
 		}
 	} else {
 		// calc perimeter
-		comp1->p = comp1->p + (4 - 2*comp1->p_raw);
+		comp1->p = comp1->p + comp1->p_dif;
+		// calc euler no
+		comp1->eu = comp1->eu + comp1->eu_dif;
 	}
 	if ( NULL != comp2->history )
 	{
@@ -287,6 +334,7 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	history->r = comp1->r;
 	history->b = comp1->b;
 	history->p = comp1->p;
+	history->eu = comp1->eu;
 	comp->head = head;
 	comp->tail = tail;
 	comp->history = history;
@@ -296,6 +344,7 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	comp->r = history->r;
 	comp->b = history->b;
 	comp->p = history->p;
+	comp->eu = history->eu;
 	
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) comp2_size=%d in MSERMergeComp <========== \n", 
 		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size, comp2->size);
@@ -687,6 +736,7 @@ int _get_ERs(
 	root->r = src->cols-1;
 	root->b = src->rows-1;
 	root->p = 2*(src->cols+src->rows);
+	root->eu = 1;
 	no_ER ++;
 
 	// create dummy pt for boundary case

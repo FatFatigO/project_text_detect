@@ -53,7 +53,7 @@ void calc_incremental_BB(int feat_id_to)
 
 void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 {
-	return; ///////////////////////////
+	//return; ///////////////////////////
 
 	// init "from" param
 	int *pt_fr_start_idx = NULL, *pt_fr_size = NULL;
@@ -98,7 +98,7 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	pt.val[7] = pt_to_size;
 
 	// bounding box
-	get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
+	//get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
 
 	// perimeter
 	get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
@@ -466,6 +466,7 @@ void main_sample_2(void)
 			IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 			//IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100), (int)((src->height*percent)/100) ), src->depth, src->nChannels);
+			//IplImage *dst = cvCreateImage(cvSize(200, 200), src->depth, src->nChannels);
 			cvResize(src, dst, CV_INTER_LINEAR);
 			img = dst;
 			//cvNamedWindow("a");
@@ -566,7 +567,7 @@ int main(void)
 	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
-	main_sample_2();
+	main_sample_1();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;
