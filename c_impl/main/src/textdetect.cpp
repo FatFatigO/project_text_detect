@@ -53,7 +53,7 @@ void calc_incremental_BB(int feat_id_to)
 
 void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 {
-	//return; ///////////////////////////
+	return; ///////////////////////////
 
 	// init "from" param
 	int *pt_fr_start_idx = NULL, *pt_fr_size = NULL;
@@ -101,10 +101,10 @@ void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
 	//get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
 
 	// perimeter
-	get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
+	//get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
 
 	// euler no
-	get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
+	//get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
 
 	// horizontal crossig
 	get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
@@ -163,8 +163,17 @@ bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_t **C)
 
 bool linear_reduction_algo(ER_t *T, ER_t *c)
 {
-	//(T->ER_val<c->ER_val)
-	return true;
+	// "T" --> "c" --> "c's child"
+	if (!T->to_parent)
+
+	if ((T->to_parent) &&
+		((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size <=
+	     (T->ER_size - c->ER_size) * 1.0 / c->ER_size))
+		// T's variance <= c's variance
+		return true;
+	else
+		// T's variance > c's variance
+		return false;
 }
 bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
 {
@@ -272,7 +281,7 @@ ER_t *linear_reduction(ER_t *T)
 			calc_incremental_feature_multi(1, fr_id, T->ER_id);
 			/* ----------------------------- END ----------------------------------*/
 
-			// link T to its new child, "c's child"
+			// remove c, link T to its new child, "c's child"
 			T->ER_firstChild = c->ER_firstChild;
 			T->to_firstChild = c->to_firstChild;
 			ER_t *t = T->to_firstChild;
@@ -304,20 +313,27 @@ ER_t *linear_reduction(ER_t *T)
 			childNo++;
 			if ((T->ER_firstChild!=d->ER_id) && (c->ER_id!=d->ER_id)) {
 				if (childNo==1) {
+					if (T->to_firstChild->to_nextSibling) {
+						T->to_firstChild->to_nextSibling->to_prevSibling = d;
+						T->to_firstChild->to_nextSibling->ER_prevSibling = d->ER_id;
+						d->to_nextSibling = T->to_firstChild->to_nextSibling;
+						d->ER_nextSibling = T->to_firstChild->ER_nextSibling;
+					}
 					T->ER_firstChild = d->ER_id;
 					T->to_firstChild = d;
-				}
-				d->ER_nextSibling = d->to_parent->ER_nextSibling;
-				d->to_nextSibling = d->to_parent->to_nextSibling;
-				if (d->to_nextSibling) {
-					d->to_nextSibling->to_prevSibling = d;
-					d->to_nextSibling->ER_prevSibling = d->ER_id;
-				}
-				d->ER_prevSibling = d->to_parent->ER_prevSibling;
-				d->to_prevSibling = d->to_parent->to_prevSibling;
-				if (d->to_prevSibling) {
-					d->to_prevSibling->to_nextSibling = d;
-					d->to_prevSibling->ER_nextSibling = d->ER_id;
+				} else {
+					d->ER_nextSibling = d->to_parent->ER_nextSibling;
+					d->to_nextSibling = d->to_parent->to_nextSibling;
+					if (d->to_nextSibling) {
+						d->to_nextSibling->to_prevSibling = d;
+						d->to_nextSibling->ER_prevSibling = d->ER_id;
+					}
+					d->ER_prevSibling = d->to_parent->ER_prevSibling;
+					d->to_prevSibling = d->to_parent->to_prevSibling;
+					if (d->to_prevSibling) {
+						d->to_prevSibling->to_nextSibling = d;
+						d->to_prevSibling->ER_nextSibling = d->ER_id;
+					}
 				}
 				d->ER_parent = T->ER_id;
 				d->to_parent = T;
@@ -332,11 +348,11 @@ ER_t *linear_reduction(ER_t *T)
 		// Feature extraction (incrementally computed from T->firstChild => T)
 		int *fr_id = (int *)malloc(childNo*sizeof(int));
 		c = T->to_firstChild;
-		for (int i=0; i<childNo; i++) {
+		for (int i=0; i<T->ER_noChild; i++) {
 			fr_id[i] = c->ER_id;
 			c = c->to_nextSibling;
 		}
-		calc_incremental_feature_multi(childNo, fr_id, T->ER_id);
+		calc_incremental_feature_multi(T->ER_noChild, fr_id, T->ER_id);
 		free(fr_id);
 		/* ----------------------------- END ----------------------------------*/
 
@@ -411,7 +427,7 @@ void get_ER_candidates(void)
 	G_td.lr_algo = linear_reduction_algo;
 	//printf("[rm_extrm] ER rest : %d\n", G_td.ER_no_rest);
 	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
-	
+	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
 	/*
 	int no_union = 0;
 	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
@@ -567,7 +583,7 @@ int main(void)
 	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
-	main_sample_1();
+	main_sample_2();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;
