@@ -58,7 +58,7 @@ typedef struct ER_t
 } ER_t;
 
 /* Provided feature API */
-extern int get_ERs(IN u8 *img_data, IN int img_rows, IN int img_cols, IN int reverse, OUT ER_t *ERs, OUT LinkedPoint *pts);
+extern int get_ERs(IN u8 *img_data, IN int img_rows, IN int img_cols, IN int img_step, IN int reverse, OUT ER_t *ERs, OUT LinkedPoint *pts);
 extern void get_BoundingBox(IN p8_t *pt, IN p4_t *feat_in, OUT p4_t *feat_out);
 extern void get_Perimeter(IN p8_t *pt, IN p1_t *feat_in, OUT p1_t *feat_out);
 extern void get_EulerNo(IN p8_t *pt, IN p1_t *feat_in, OUT p1_t *feat_out);

@@ -62,6 +62,7 @@ initMSERComp( MSERConnectedComp* comp )
 	comp->var = 0;
 	comp->dvar = 1;
 	comp->history = NULL;
+	comp->l = comp->t = comp->r = comp->b = comp->p = comp->p_dif = comp->eu = comp->eu_dif = 0;
 }
 
 // add a pixel to the pixel list
@@ -85,7 +86,9 @@ static void accumulateMSERComp( MSERConnectedComp* comp, LinkedPoint* point )
 		if (G_imf_er.ptsmap[cor2idx(point->pt.x+1, point->pt.y+2, G_imf_er.img_cols+2)]) q = q + 1;//b
 		if (G_imf_er.ptsmap[cor2idx(point->pt.x,   point->pt.y+1, G_imf_er.img_cols+2)]) q = q + 1;//l
 		if (G_imf_er.ptsmap[cor2idx(point->pt.x+1, point->pt.y  , G_imf_er.img_cols+2)]) q = q + 1;//t
-		comp->p_dif = 4 - 2*q;
+		comp->p_dif = comp->p_dif + (4 - 2*q);
+		if (comp->p_dif + comp->p < 4)
+			comp = comp;
 		// calc euler no
 		int q1 = 0, q3 = 0, qd = 0;
 		int ori_lt = G_imf_er.ptsmap[cor2idx(point->pt.x  , point->pt.y  , G_imf_er.img_cols+2)];
@@ -112,7 +115,7 @@ static void accumulateMSERComp( MSERConnectedComp* comp, LinkedPoint* point )
 			+ ((acu_sum_lb_block==2) && (ori_lb==1)) + ((acu_sum_rb_block==2) && (ori_rb==1))
 			- ((ori_sum_lt_block==2) && (ori_lt==0)) - ((ori_sum_rt_block==2) && (ori_rt==0))
 			- ((ori_sum_lb_block==2) && (ori_lb==0)) - ((ori_sum_rb_block==2) && (ori_rb==0));
-		comp->eu_dif = (q1 - q3 + 2*qd) / 4; 
+		comp->eu_dif = comp->eu_dif + (q1 - q3 + 2*qd) / 4; 
 	} else {
 		point->prev = NULL;
 		point->next = NULL;
@@ -146,11 +149,6 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 	{
 		//history->shortcut = history; //kevin marked
 		//history->stable = 0; //kevin marked
-
-		// calc perimeter
-		comp->p = comp->p + comp->p_dif;
-		// calc euler no
-		comp->eu = comp->eu + comp->eu_dif;
 	} else {
 		//comp->history->child = history; //kevin marked
 		//history->shortcut = comp->history->shortcut; //kevin marked
@@ -168,26 +166,18 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 		while ( cur )
 		{
 			if (cur != comp->history) history->ER_noChild++;
-			comp->l = MIN(comp->l, cur->l);
-			comp->t = MIN(comp->t, cur->t);
-			comp->r = MAX(comp->r, cur->r);
-			comp->b = MAX(comp->b, cur->b);
-			// calc perimeter
-			if (cur == comp->history)
-				comp->p = comp->p + comp->p_dif;
-			else
-				comp->p = comp->p + cur->p;
-			// calc euler no
-			if (cur == comp->history)
-				comp->eu = comp->eu + comp->eu_dif;
-			else
-				comp->eu = comp->eu + cur->eu;
-
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
 			cur = cur->to_nextSibling;
 		}
 	}
+	// calc perimeter
+	comp->p = comp->p + comp->p_dif;
+	comp->p_dif = 0;
+	// calc euler no
+	comp->eu = comp->eu + comp->eu_dif;
+	comp->eu_dif = 0;
+
 	history->val = comp->grey_level;
 	history->size = comp->size;
 	// update comp->history as the last created history
@@ -206,7 +196,7 @@ MSERNewHistory( MSERConnectedComp* comp, ER_t* history )
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) in MSERNewHistory <========== \n", 
 		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size);
 }
-
+extern void plot_ER(ER_t *T);
 // merging two connected component
 static void
 MSERMergeComp( MSERConnectedComp* comp1,
@@ -295,30 +285,10 @@ MSERMergeComp( MSERConnectedComp* comp1,
 		while ( cur )
 		{
 			if (cur != comp1->history) history->ER_noChild++;
-			comp1->l = MIN(comp1->l, cur->l);
-			comp1->t = MIN(comp1->t, cur->t);
-			comp1->r = MAX(comp1->r, cur->r);
-			comp1->b = MAX(comp1->b, cur->b);
-			// calc perimeter
-			if (cur == comp1->history)
-				comp1->p = comp1->p + comp1->p_dif;
-			else
-				comp1->p = comp1->p + cur->p;
-			// calc euler no
-			if (cur == comp1->history)
-				comp1->eu = comp1->eu + comp1->eu_dif;
-			else
-				comp1->eu = comp1->eu + cur->eu;
-
 			cur->ER_parent = history->ER_id;
 			cur->to_parent = history;
 			cur = cur->to_nextSibling;
 		}
-	} else {
-		// calc perimeter
-		comp1->p = comp1->p + comp1->p_dif;
-		// calc euler no
-		comp1->eu = comp1->eu + comp1->eu_dif;
 	}
 	if ( NULL != comp2->history )
 	{
@@ -328,6 +298,13 @@ MSERMergeComp( MSERConnectedComp* comp1,
 		comp2->history->ER_prevSibling = history->ER_id;
 		comp2->history->to_prevSibling = history;
 	}
+
+	// calc perimeter
+	comp1->p = comp1->p + comp1->p_dif;
+	comp1->p_dif = 0;
+	// calc euler no
+	comp1->eu = comp1->eu + comp1->eu_dif;
+	comp1->eu_dif = 0;
 
 	history->l = comp1->l;
 	history->t = comp1->t;
@@ -339,12 +316,12 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	comp->tail = tail;
 	comp->history = history;
 	comp->size = comp1->size + comp2->size;
-	comp->l = history->l;
-	comp->t = history->t;
-	comp->r = history->r;
-	comp->b = history->b;
-	comp->p = history->p;
-	comp->eu = history->eu;
+	comp->l = MIN(comp1->l, comp2->l);
+	comp->t = MIN(comp1->t, comp2->t);
+	comp->r = MAX(comp1->r, comp2->r);
+	comp->b = MAX(comp1->b, comp2->b);
+	comp->p = comp1->p + comp2->p;
+	comp->eu = comp1->eu + comp2->eu;
 	
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) comp2_size=%d in MSERMergeComp <========== \n", 
 		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size, comp2->size);
@@ -688,7 +665,7 @@ int _get_ERs(
 		ERs[i].to_firstChild = NULL;
 		ERs[i].to_nextSibling = NULL;
 		ERs[i].to_prevSibling = NULL;
-		ERs[i].l = ERs[i].t = ERs[i].r = ERs[i].b = -1;
+		ERs[i].l = ERs[i].t = ERs[i].r = ERs[i].b = ERs[i].p = ERs[i].eu = 0;
 	}
 	// assign global variables
 	G_imf_er.img_cols = src->cols;
@@ -778,6 +755,7 @@ int get_ERs(
 			 IN u8 *img_data,
 			 IN int img_rows,
 			 IN int img_cols,
+			 IN int img_step,
 			 IN int reverse,
 			 OUT ER_t *ERs,
 			 OUT LinkedPoint *pts)
@@ -794,7 +772,7 @@ int get_ERs(
 	img.data.ptr = img_data;
 	img.rows = img_rows;
 	img.cols = img_cols;
-	img.step = img_cols;
+	img.step = img_step;
 	G_imf_er.pt_order = 0;
 
 	return _get_ERs(&img, ERs, pts, reverse);

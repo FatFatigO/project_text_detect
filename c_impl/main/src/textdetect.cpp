@@ -2,7 +2,8 @@
 #include "../include/system.h"
 #include "../include/imfeat.h"
 #include "../include/textdetect.h"
-//#include <iostream>
+#include <iostream>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <fstream>
 #include <sstream>
@@ -24,6 +25,50 @@ using namespace cv;
 
 /* global variable */
 G_textdetect_t G_td;
+
+/* plot utility function */
+void plot_ER(ER_t *T)
+{
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
+	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
+	LinkedPoint *cur = T->ER_head;
+	for (int j=0; j<T->ER_size; j++) {
+		img_data[cur->pt.y*(*G_td.img->step.p)+cur->pt.x] = 255;
+		cur = cur->next;
+	}
+	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
+	IplImage *dst = cvCreateImage(size, 8, 1);
+	dst->imageData = (char *)img_data;
+
+	cvNamedWindow("a");
+	cvShowImage("a", dst);
+	cvWaitKey(0);
+
+	free(img_data);
+}
+
+/* save utility function */
+void save_ER(ER_t *T, int idx)
+{
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
+	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
+	LinkedPoint *cur = T->ER_head;
+	for (int j=0; j<T->ER_size; j++) {
+		img_data[cur->pt.y*(*G_td.img->step.p)+cur->pt.x] = 255;
+		cur = cur->next;
+	}
+	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
+	IplImage *dst = cvCreateImage(size, 8, 1);
+	dst->imageData = (char *)img_data;
+
+	char filepath[100];
+	sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/%05d.jpg", G_td.img_id, idx);
+	cvSaveImage(filepath, dst);
+
+	free(img_data);
+}
+
+
 
 void calc_incremental_BB(int feat_id_to)
 {
@@ -160,20 +205,79 @@ bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_t **C)
 		return false;
 }
 
-
 bool linear_reduction_algo(ER_t *T, ER_t *c)
 {
-	// "T" --> "c" --> "c's child"
-	if (!T->to_parent)
+	// Before:        --> "T" --> "c" --> "c's child"
+	// After(True):   --> "T" ----------> "c's child"
+	// After(False):  ----------> "c" --> "c's child"
+	double pvar_T = (T->to_parent) ? ((T->to_parent->p - T->p) * 1.0 / T->p) : 0;
+	double pvar_c = (T->p - c->p) * 1.0 / c->p;
+	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	double svar_c = (T->ER_size - c->ER_size) * 1.0 / c->ER_size;
 
+	double lumbda_1 = 1;
+	double lumbda_2 = 1;
+	double var_T = (pvar_T > 0) ? (svar_T + lumbda_1 * pvar_T) : (svar_T + lumbda_2 * pvar_T);
+	double var_c = (pvar_c > 0) ? (svar_c + lumbda_1 * pvar_c) : (svar_c + lumbda_2 * pvar_c);
+
+	if (0){//(T->ER_size > 100) {
+		cout << "T: size var=" << svar_T << endl;
+		cout << "T: peri var=" << pvar_T << endl;
+		plot_ER(T);
+		cout << "c: size var=" << svar_c << endl;
+		cout << "c: peri var=" << pvar_c << endl;
+		plot_ER(c);
+		cout << "T: var=" << var_T << endl;
+		cout << "c: var=" << var_c << endl;
+	}
+
+	if (svar_T <= svar_c) {
+		// T's variance <= c's variance
+		//cout << "T is better!" << endl;
+		//int a;
+		//cin >> a;
+		return true;
+	} else {
+		// T's variance > c's variance
+		//cout << "c is better!" << endl;
+		//int a;
+		//cin >> a;
+		return false;
+	}
+}
+bool linear_reduction_algo2(ER_t *T, ER_t *c)
+{
+	// "T" --> "c" --> "c's child"
 	if ((T->to_parent) &&
 		((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size <=
-	     (T->ER_size - c->ER_size) * 1.0 / c->ER_size))
+	     (T->ER_size - c->ER_size) * 1.0 / c->ER_size)) {
 		// T's variance <= c's variance
+		if (0) {//(T->ER_size > 100) {
+			if (T->p > 9999)
+				T = T;
+			cout << "T: size var=" << (T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size << endl;
+			cout << "T: peri var=" << (T->to_parent->p - T->p) * 1.0 / T->p << " " << T->p << "->" << T->to_parent->p << endl;
+			plot_ER(T);
+			cout << "c: size var=" << (T->ER_size - c->ER_size) * 1.0 / c->ER_size << endl;
+			cout << "c: peri var=" << (T->p - c->p) * 1.0 / c->p << " " << c->p << "->" << T->p << endl;
+			cout << "T is better!" << endl;
+			plot_ER(c);
+		}
+
 		return true;
-	else
+	} else {
 		// T's variance > c's variance
+		if (0) {//(T->ER_size > 100) {
+			cout << "T: size var=" << (T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size << endl;
+			cout << "T: peri var=" << (T->to_parent->p - T->p) * 1.0 / T->p << " " << T->p << "->" << T->to_parent->p << endl;
+			plot_ER(T);
+			cout << "c: size var=" << (T->ER_size - c->ER_size) * 1.0 / c->ER_size << endl;
+			cout << "c: peri var=" << (T->p - c->p) * 1.0 / c->p << " " << c->p << "->" << T->p << endl;
+			cout << "c is better!" << endl;
+			plot_ER(c);
+		}
 		return false;
+	}
 }
 bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
 {
@@ -256,6 +360,19 @@ end procedure
 ER_t *linear_reduction(ER_t *T)
 {
 	int a = T->ER_id;
+#if 0
+	if (T->ER_size > 100) {
+		cout << a << endl;
+		plot_ER(T);
+		ER_t *cur = T->to_firstChild;
+		/*
+		while(cur) {
+			if (cur->ER_size > 100)
+				plot_ER(cur);
+			cur = cur->to_nextSibling;
+		}*/
+	}
+#endif
 	if (T->ER_noChild == 0) {
 		// has no child
 		printff("[%d] has no child, return %d\n",a,T->ER_id);
@@ -282,6 +399,7 @@ ER_t *linear_reduction(ER_t *T)
 			/* ----------------------------- END ----------------------------------*/
 
 			// remove c, link T to its new child, "c's child"
+			T->ER_noChild = c->ER_noChild;
 			T->ER_firstChild = c->ER_firstChild;
 			T->to_firstChild = c->to_firstChild;
 			ER_t *t = T->to_firstChild;
@@ -322,14 +440,14 @@ ER_t *linear_reduction(ER_t *T)
 					T->ER_firstChild = d->ER_id;
 					T->to_firstChild = d;
 				} else {
-					d->ER_nextSibling = d->to_parent->ER_nextSibling;
-					d->to_nextSibling = d->to_parent->to_nextSibling;
+					d->ER_nextSibling = c->ER_nextSibling;
+					d->to_nextSibling = c->to_nextSibling;
 					if (d->to_nextSibling) {
 						d->to_nextSibling->to_prevSibling = d;
 						d->to_nextSibling->ER_prevSibling = d->ER_id;
 					}
-					d->ER_prevSibling = d->to_parent->ER_prevSibling;
-					d->to_prevSibling = d->to_parent->to_prevSibling;
+					d->ER_prevSibling = c->ER_prevSibling;
+					d->to_prevSibling = c->to_prevSibling;
 					if (d->to_prevSibling) {
 						d->to_prevSibling->to_nextSibling = d;
 						d->to_prevSibling->ER_nextSibling = d->ER_id;
@@ -419,43 +537,43 @@ void tree_remove_extreme_size_ER(ER_t *v)
 
 void get_ER_candidates(void)
 {
+	/* Remove extreme size */
 	G_td.ER_no_rest = G_td.ER_no;
 	printf("[original] ER rest : %d\n", G_td.ER_no_rest);
 	//tree_remove_extreme_size_ER(&G_td.ERs[G_td.ER_no-1]);
 
+	/* Linear reduction */
 	//G_td.lr_algo = linear_reduction_algo_1;
 	G_td.lr_algo = linear_reduction_algo;
 	//printf("[rm_extrm] ER rest : %d\n", G_td.ER_no_rest);
-	linear_reduction(&G_td.ERs[G_td.ER_no-1]);
-	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
-	/*
+	ER_t *root = &G_td.ERs[G_td.ER_no-1];
+	root = linear_reduction(root);
+	//printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
+	
+	/* Tree accumulation */
 	int no_union = 0;
 	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
 	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
 	G_td.ta_algo = tree_accumulation_algo_1;
-	tree_accumulation(&G_td.ERs[G_td.ER_no-1], &no_union, ER_union);
+	tree_accumulation(root, &no_union, ER_union);
 	printf("[tr_accum] ER rest : %d\n", no_union);
 
+	/* Print result */
 #if 1
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*G_td.img->cols*sizeof(u8)); 
+	char filepath[100];
+	sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]", G_td.img_id);
+
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
 	for (int i=0; i<no_union; i++) {
-		memset(img_data, 0, G_td.img->rows*G_td.img->cols*sizeof(u8));
-		LinkedPoint *cur = ER_union[i]->ER_head;
-		for (int j=0; j<ER_union[i]->ER_size; j++) {
-			img_data[cur->pt.y*G_td.img->cols+cur->pt.x] = 255;
-			cur = cur->next;
-		}
-		CvSize size = {G_td.img->cols, G_td.img->rows};
-		IplImage *dst = cvCreateImage(size, 8, 1);
-		dst->imageData = (char *)img_data;
-		cvNamedWindow("a");
-		cvShowImage("a", dst);
-		cvWaitKey(0);
+		if (ER_union[i]->ER_size < G_td.r.min_size)
+			continue;
+		save_ER(ER_union[i], i);
+		//plot_ER(&ER_union[i]);
 	}
 	free(img_data);
 #endif
 	free(ER_union);
-	*/
+
 }
 
 
@@ -478,9 +596,11 @@ void main_sample_2(void)
 		if (0) {
 			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
 		} else {
-			double percent = 50;
-			IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+			double percent = 100;
+			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 			//IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
+			IplImage *src = cvLoadImage("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
+			//IplImage *src = cvLoadImage("SMALL_S.png", CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100), (int)((src->height*percent)/100) ), src->depth, src->nChannels);
 			//IplImage *dst = cvCreateImage(cvSize(200, 200), src->depth, src->nChannels);
 			cvResize(src, dst, CV_INTER_LINEAR);
@@ -491,14 +611,16 @@ void main_sample_2(void)
 		}
 		printf("Time taken: %.2fs (size %d x %d)\n", (double)(clock() - tStart)/CLOCKS_PER_SEC, img.cols, img.rows); tStart = clock();
 
+		G_td.img = &img;
+		G_td.img_id = ii;
+
 		// get ERs
 		ER_t *ERs = (ER_t *)malloc(img.rows*img.cols*sizeof(ERs[0]));
 		LinkedPoint *pts = (LinkedPoint*)malloc((img.rows*img.cols+1)*sizeof(pts[0]));
-		int ER_no = get_ERs(img.data, img.rows, img.cols, 0/*2:see debug msg*/, ERs, pts);
+		int ER_no = get_ERs(img.data, img.rows, img.cols, *img.step.buf, 0/*2:see debug msg*/, ERs, pts);
 		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock(); 
 
 		// assign some global variables
-		G_td.img = &img;
 		G_td.ERs = ERs;
 		G_td.ER_no = ER_no;
 		G_td.pts = pts;
@@ -537,6 +659,14 @@ int main_sample_1(void)
 	img_ptr[4] =  2; img_ptr[5] =  2; img_ptr[6] =  3; img_ptr[7] =  2;
 	img_ptr[8] =  3; img_ptr[9] =  3; img_ptr[10] = 3; img_ptr[11] = 2;
 	img_ptr[12] = 1; img_ptr[13] = 2; img_ptr[14] = 3; img_ptr[15] = 4;
+#elif 1
+	int img_cols = 3;
+	int img_rows = 3;
+	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
+	u8* img_ptr = img_data;
+	img_ptr[0] = 253; img_ptr[1] = 254; img_ptr[2] = 252;
+	img_ptr[3] = 254; img_ptr[4] = 254; img_ptr[5] = 252;
+	img_ptr[6] = 252; img_ptr[7] = 252; img_ptr[8] = 253; 
 #else
 	int img_cols = 5;
 	int img_rows = 3;
@@ -549,11 +679,12 @@ int main_sample_1(void)
 	Mat img;
 	img.rows = img_rows;
 	img.cols = img_cols;
+	int img_step = img_cols;
 
 	// get ERs
 	ER_t* ERs = (ER_t *)malloc(img_rows*img_cols*sizeof(ERs[0]));
 	LinkedPoint* pts = (LinkedPoint*)malloc((img_rows*img_cols+1)*sizeof(pts[0]));
-	int ER_no = get_ERs(img_data, img_rows, img_cols, 0/*2:see debug msg*/, ERs, pts);
+	int ER_no = get_ERs(img_data, img_rows, img_cols, img_step, 0/*2:see debug msg*/, ERs, pts);
 
 	// assign some global variables
 	G_td.img = &img;
@@ -580,7 +711,7 @@ int main_sample_1(void)
 
 int main(void)
 {
-	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
+	rules_t rules = {30, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
 	main_sample_2();

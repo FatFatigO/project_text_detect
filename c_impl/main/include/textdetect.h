@@ -32,6 +32,7 @@ typedef struct rules_t
 typedef struct G_textdetect_t
 {
 	Mat *img;            // current image
+	int img_id;          // current image id
 	ER_t *ERs;           // ERs
 	int ER_no;           // ER no
 	int ER_no_rest;      // ER no rest
