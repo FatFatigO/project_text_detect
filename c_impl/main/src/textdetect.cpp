@@ -188,20 +188,40 @@ bool linear_reduction_algo_1(ER_t *T, ER_t *c)
 	else
 		return false;
 }
-bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_t **C)
+bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
 	// return false: c is better
-	int min_var_C = 10000000;
+	if (T->ER_id == 355)
+		T = T;
+	double min_var_C = 10000000;
+	double min_pvar_C = 10000000;
+	ER_un_t *cur = C;
 	for (int i=0; i<C_no; i++) {
-		float var_c = (C[i]->to_parent->ER_size - C[i]->ER_size)*1.0 / C[i]->ER_size;
+		double var_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
+		double pvar_c = (cur->ER->to_parent->p - cur->ER->p) * 1.0 / cur->ER->p;
+		if (var_c==0)
+			T = T;
 		if (var_c < min_var_C)
 			min_var_C = var_c;
+		if (pvar_c < min_pvar_C)
+			min_pvar_C = pvar_c;
+		cur = cur->next;
 	}
-	if ((T->to_parent) && (((T->to_parent->ER_size - T->ER_size)*1.0 / T->ER_size) <= min_var_C))
+
+	double pvar_T = (T->to_parent) ? ((T->to_parent->p - T->p) * 1.0 / T->p) : 0;
+
+	if ((T->to_parent) && (((T->to_parent->ER_size - T->ER_size)*1.0 / T->ER_size) <= min_var_C)) {
+		save_ER(T, 999999);
+		cur = C;
+		for (int i=0; i<C_no; i++) {
+			save_ER(cur->ER, i);
+			cur = cur->next;
+		}
+		
 		return true;
-	else
+	} else
 		return false;
 }
 
@@ -304,30 +324,65 @@ procedure TREE-ACCUMULATION(T)
 end procedure
 */
 
-void tree_accumulation(ER_t *T, int *out_no, ER_t **out)
+ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 {
+	if (T->ER_id == 86)
+		T = T;
 	if (T->ER_noChild == 0) {
 		// has no child
-		out[*out_no] = T;
-		*out_no += 1;
-		return;
+
+		/// return single union node T
+		G_td.ER_un[T->ER_id].ER = T;
+		G_td.ER_un[T->ER_id].prev = NULL;
+		G_td.ER_un[T->ER_id].next = NULL;
+		(*C_no_this)++;
+		
+		return &G_td.ER_un[T->ER_id];
 	} else if (T->ER_noChild >= 2) {
 		// has more than two children
+		int C_no = 0;
+		ER_un_t *C = NULL, *C_cur = NULL, *C_ret = NULL;
+
 		ER_t *c = T->to_firstChild;
 		while (c) {
-			tree_accumulation(c, out_no, out);
+			/// obtain accumulated union C_ret head 
+			C_ret = tree_accumulation(c, &C_no);
+			/// union by linking current union C tail with accumlated union C_ret head
+			if (C_no == 5)
+				C_no = C_no;
+			if (c == T->to_firstChild) {
+				C = C_ret;
+			} else {
+				C_cur->next = C_ret;
+				C_ret->prev = C_cur;
+			}
+			ER_un_t *cur = C_ret;
+			while (cur->next)
+				cur = cur->next;
+			C_cur = cur;
 			c = c->to_nextSibling;
 		}
-		if (G_td.ta_algo(T, *out_no, out)) {
+		if (T->ER_id == 116)
+			T = T;
+		if (G_td.ta_algo(T, C_no, C)) {
 			//discard-children(T)
 			T->ER_firstChild = -1;
 			T->to_firstChild = NULL;
 			//return T
-			*out_no = 0;
-			return;
+
+			/// return single union node T
+			G_td.ER_un[T->ER_id].ER = T;
+			G_td.ER_un[T->ER_id].prev = NULL;
+			G_td.ER_un[T->ER_id].next = NULL;
+			(*C_no_this)++;
+
+			return &G_td.ER_un[T->ER_id];
 		} else {
 			//return C
-			return;
+
+			/// return current union head node C
+			(*C_no_this) += C_no;
+			return C;
 		}
 	} else {
 		// has only one child
@@ -410,10 +465,11 @@ ER_t *linear_reduction(ER_t *T)
 			}
 			printff("[%d] link %d to its new child %d\n",a,T->ER_id,c->ER_firstChild);
 			printff("[%d] return %d \n",a,T->ER_id);
-
+			G_td.ER_no_array[c->ER_id] = 0;
 			return T; // T is better
 		} else {
 			printff("[%d] return %d \n",a,c->ER_id);
+			G_td.ER_no_array[T->ER_id] = 0;
 			return c; // c is better
 		}
 	} else {
@@ -550,12 +606,21 @@ void get_ER_candidates(void)
 	root = linear_reduction(root);
 	//printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
 	
+#if 0
+	for (int i=0; i<G_td.ER_no; i++) {
+		if (G_td.ER_no_array[i]) {
+			if (G_td.ERs[i].ER_size < G_td.r.min_size)
+				continue;
+			save_ER(&G_td.ERs[i], i);
+		}
+	}
+#endif
+
 	/* Tree accumulation */
 	int no_union = 0;
-	ER_t **ER_union = (ER_t **)malloc(G_td.ER_no*sizeof(ER_t *));
 	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
 	G_td.ta_algo = tree_accumulation_algo_1;
-	tree_accumulation(root, &no_union, ER_union);
+	ER_un_t *C_union = tree_accumulation(root, &no_union);
 	printf("[tr_accum] ER rest : %d\n", no_union);
 
 	/* Print result */
@@ -563,16 +628,17 @@ void get_ER_candidates(void)
 	char filepath[100];
 	sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]", G_td.img_id);
 
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
+	ER_un_t *cur = C_union;
 	for (int i=0; i<no_union; i++) {
-		if (ER_union[i]->ER_size < G_td.r.min_size)
+		if (cur->ER->ER_size < G_td.r.min_size)
 			continue;
-		save_ER(ER_union[i], i);
+		save_ER(cur->ER, i);
 		//plot_ER(&ER_union[i]);
+		cur = cur->next;
 	}
 	free(img_data);
 #endif
-	free(ER_union);
 
 }
 
@@ -596,7 +662,7 @@ void main_sample_2(void)
 		if (0) {
 			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
 		} else {
-			double percent = 100;
+			double percent = 5;
 			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 			//IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *src = cvLoadImage("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
@@ -628,6 +694,10 @@ void main_sample_2(void)
 		// prepare for getting ER candidates
 		G_td.featraw = (featraw_t *)malloc(ER_no*sizeof(featraw_t));
 		memset(G_td.featraw, 0, ER_no*sizeof(featraw_t));
+		G_td.ER_no_array = (u8 *)malloc(ER_no*sizeof(u8));
+		memset(G_td.ER_no_array, 1 , ER_no*sizeof(u8));
+		G_td.ER_un = (ER_un_t *)malloc(ER_no*sizeof(ER_un_t));
+		memset(G_td.ER_un, 0 , ER_no*sizeof(ER_un_t));
 
 		// get ER candidates
 		get_ER_candidates();
@@ -711,7 +781,7 @@ int main_sample_1(void)
 
 int main(void)
 {
-	rules_t rules = {30, 0.0019, 0.4562, 0.0100, 0.7989};
+	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
 	main_sample_2();

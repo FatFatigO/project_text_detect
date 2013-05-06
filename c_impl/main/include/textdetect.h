@@ -19,6 +19,13 @@ typedef struct featraw_t
 	int *HC_buf;	// buf addr backup for memory relase
 } featraw_t;
 
+typedef struct ER_un_t
+{
+	ER_t *ER;
+	ER_un_t *prev;
+	ER_un_t *next;
+} ER_un_t;
+
 typedef struct rules_t
 {
 	int min_size;// = 30;
@@ -36,12 +43,14 @@ typedef struct G_textdetect_t
 	ER_t *ERs;           // ERs
 	int ER_no;           // ER no
 	int ER_no_rest;      // ER no rest
+	u8 *ER_no_array;     // ER no array
+	ER_un_t *ER_un;      // ER union after tree accumulation
 	LinkedPoint *pts;    // points
 	featraw_t *featraw;  // raw feature for each ER
 	rules_t r;           // rule constants
 
-	bool (*lr_algo)(ER_t *, ER_t *);       // linear-reduction algo
-	bool (*ta_algo)(ER_t *, int, ER_t **); // tree-accumulation algo
+	bool (*lr_algo)(ER_t *, ER_t *);              // linear-reduction algo
+	bool (*ta_algo)(ER_t *, int, ER_un_t *);    // tree-accumulation algo
 
 } G_textdetect_t;
 
