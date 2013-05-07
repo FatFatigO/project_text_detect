@@ -11,6 +11,7 @@
 #include <cv.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include "opencv/ml.h"
 /*
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
@@ -716,7 +717,6 @@ void main_sample_2(void)
 	}
 }
 
-
 int main_sample_1(void) 
 {
 	// get image
@@ -779,12 +779,58 @@ int main_sample_1(void)
 	return 0;
 }
 
+int main_sample_3(void)
+{
+	const int ntestsamples = 11;
+	CvMat* featureVectorSamples = cvCreateMat(ntestsamples, 2, CV_32F);
+    {
+        CvMat mat;
+        cvGetRows(featureVectorSamples, &mat, 0, 1);
+        cvSet(&mat, cvRealScalar(1));
+    }
+    {
+        CvMat mat;
+        cvGetRows(featureVectorSamples, &mat, 1, ntestsamples);
+        cvSet(&mat, cvRealScalar(0));
+    }
+    int var_count = featureVectorSamples->cols; // number of single features=variables
+    int nsamples_all = featureVectorSamples->rows; // number of samples=feature vectors
+	
+    CvMat* classLabelResponses = cvCreateMat(nsamples_all, 1, CV_32S);
+    {
+        CvMat mat;
+        cvGetRows(classLabelResponses, &mat, 0, 1);
+        cvSet(&mat, cvRealScalar(1));
+    }
+    {
+        CvMat mat;
+        cvGetRows(classLabelResponses, &mat, 1, nsamples_all);
+        cvSet(&mat, cvRealScalar(-1));
+    }
+
+	CvMat* var_type = cvCreateMat(var_count + 1, 1, CV_8U);
+    cvSet(var_type, cvScalarAll(CV_VAR_ORDERED)); // Inits all to 0 like the code below
+	var_type->data.ptr[var_count] = CV_VAR_CATEGORICAL;
+
+	CvBoost boost;
+	boost.train(featureVectorSamples, CV_ROW_SAMPLE, classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
+	boost.save("./boosttest.xml", "boost");
+
+	CvMat testSamples;
+	cvGetRows(featureVectorSamples, &testSamples, 1, 2);
+	float ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
+	float ans2 = boost.predict(&testSamples);
+
+	return 0;
+}
+
+
 int main(void)
 {
 	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
-	main_sample_2();
+	main_sample_3();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;
