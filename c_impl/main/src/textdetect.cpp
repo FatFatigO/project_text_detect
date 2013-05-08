@@ -781,45 +781,38 @@ int main_sample_1(void)
 
 int main_sample_3(void)
 {
-	const int ntestsamples = 11;
-	CvMat* featureVectorSamples = cvCreateMat(ntestsamples, 2, CV_32F);
-    {
-        CvMat mat;
-        cvGetRows(featureVectorSamples, &mat, 0, 1);
-        cvSet(&mat, cvRealScalar(1));
-    }
-    {
-        CvMat mat;
-        cvGetRows(featureVectorSamples, &mat, 1, ntestsamples);
-        cvSet(&mat, cvRealScalar(0));
-    }
-    int var_count = featureVectorSamples->cols; // number of single features=variables
-    int nsamples_all = featureVectorSamples->rows; // number of samples=feature vectors
-	
-    CvMat* classLabelResponses = cvCreateMat(nsamples_all, 1, CV_32S);
-    {
-        CvMat mat;
-        cvGetRows(classLabelResponses, &mat, 0, 1);
-        cvSet(&mat, cvRealScalar(1));
-    }
-    {
-        CvMat mat;
-        cvGetRows(classLabelResponses, &mat, 1, nsamples_all);
-        cvSet(&mat, cvRealScalar(-1));
-    }
+	// Train boost classifier
+	Mat featureVectorSample;
+	Mat classLabelResponse;
+	string demoFile = "../../../../../Codes/_output_files/Feature_vectors/fv.yml";
+	FileStorage fsDemo(demoFile, FileStorage::READ);
+	fsDemo["fv_save"] >> featureVectorSample;
+	fsDemo["lb_save"] >> classLabelResponse;
+	int var_count = featureVectorSample.cols;
+	int nsamples_all = featureVectorSample.rows;
+	CvMat featureVectorSamples = featureVectorSample;
+	CvMat classLabelResponses = classLabelResponse;
 
 	CvMat* var_type = cvCreateMat(var_count + 1, 1, CV_8U);
-    cvSet(var_type, cvScalarAll(CV_VAR_ORDERED)); // Inits all to 0 like the code below
+	cvSet(var_type, cvScalarAll(CV_VAR_ORDERED)); // Inits all to 0 like the code below
 	var_type->data.ptr[var_count] = CV_VAR_CATEGORICAL;
 
 	CvBoost boost;
-	boost.train(featureVectorSamples, CV_ROW_SAMPLE, classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
-	boost.save("./boosttest.xml", "boost");
+	boost.train(&featureVectorSamples, CV_ROW_SAMPLE, &classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
+	boost.save("./boost_3fv.xml", "boost");
 
+	// Test boost classifier
+	//boost.load("./boost_3fv.xml", "boost");
 	CvMat testSamples;
-	cvGetRows(featureVectorSamples, &testSamples, 1, 2);
-	float ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
-	float ans2 = boost.predict(&testSamples);
+	float ans1, ans2;
+
+	cvGetRows(&featureVectorSamples, &testSamples, 1, 2);
+	ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
+	ans2 = boost.predict(&testSamples);
+
+	cvGetRows(&featureVectorSamples, &testSamples, 3000, 3001);
+	ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
+	ans2 = boost.predict(&testSamples);
 
 	return 0;
 }

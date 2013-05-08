@@ -17,7 +17,7 @@ PATH.TEST_FROM_PRUNED_ADA6 = '../../../../../LargeFiles/MSRATD500/[034] IMG_0638
 PATH.TEST_FROM_PRUNED_ADA7 = '../../../../../LargeFiles/MSRATD500/[037] IMG_0667.JPG_400x400_ER_candidate_img_0_[0228_1140]/';
 
 
-NAME.FEATVEC_MAT = '0311_test02_traditional_4_plus_3';
+NAME.FEATVEC_MAT = '0311_test01_traditional_4_plus_3';
 NAME.CLASSIFIER_MAT = 'svm_ova_w_non_0311_test02_traditional_4_plus_3';
 NAME.TESTING_DATASET = 'MSRATD500';
 NAME.TESTING_SIZE = '400x400';
@@ -28,18 +28,18 @@ FEAT.RANDPROJBITS = 8;
 FEAT.RANDPROJMATRIX = normrnd(0,1,FEAT.SHAPECONTEXT(2)*FEAT.SHAPECONTEXT(3),FEAT.RANDPROJBITS);
 
 STAGE = [ ...
-              %     <Char74K (chars)>
-    '001';... % r1: collect & save feat vectors from dataset
+ %r: 321      %     <Char74K (chars)>
+    '000';... % r1: collect & save feat vectors from dataset
               %     <MSRATD500 (nonchars)>
-    '110';... % r1: random and save as .png
+    '000';... % r1: random and save as .png
               % r2: collect feat vectors from .png
               % r3: save feat vectors
               %     <Training SVM>
-    '010';... % r1: train one versus all(w/o non) classifier for each chars
+    '100';... % r1: train one versus all(w/o non) classifier for each chars
               % r2: train one versus all(w/  non) classifier for each chars
               % r3: train char versus nonchar classifier
               %     <Testing SVM>
-    '010'];   % r1: test by Char74K images 
+    '000'];   % r1: test by Char74K images 
               % r2: test by Pruned Ada .png
 
 % extract char features
