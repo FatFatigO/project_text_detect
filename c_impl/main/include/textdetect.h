@@ -48,6 +48,7 @@ typedef struct G_textdetect_t
 	LinkedPoint *pts;    // points
 	featraw_t *featraw;  // raw feature for each ER
 	rules_t r;           // rule constants
+	void *boost;         // boost classifier
 
 	bool (*lr_algo)(ER_t *, ER_t *);              // linear-reduction algo
 	bool (*ta_algo)(ER_t *, int, ER_un_t *);    // tree-accumulation algo

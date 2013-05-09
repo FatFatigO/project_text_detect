@@ -69,7 +69,29 @@ void save_ER(ER_t *T, int idx)
 	free(img_data);
 }
 
+/*  given ER, calc posterior probability by features (ar,compactness,number of hole) */
+float calc_postp_by_feat_ar_cp_nh(ER_t *T)
+{
+#if 0
+    // aspect ratio
+	float ar = (T->r - T->l + 1) * 1.0 / (T->b - T->t + 1);  
+    // compactness
+	float cp = sqrt((double)T->ER_size) * 1.0 / T->p;
+    // number of holes
+	float nh = 1 - T->eu;
 
+	CvBoost *boost = (CvBoost *)G_td.boost;
+	float data[3] = {ar, cp, nh};
+	CvMat testSamples = cv::Mat(1, 3, CV_32FC1, (void *)data);
+	float score, postp;
+	boost->load("./boost_3fv.xml", "boost");
+	score = boost->predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
+
+	return 1.0/(1+exp(-2*abs(score)));
+#else
+	return T->postp;
+#endif
+}
 
 void calc_incremental_BB(int feat_id_to)
 {
@@ -189,38 +211,44 @@ bool linear_reduction_algo_1(ER_t *T, ER_t *c)
 	else
 		return false;
 }
+
 bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
 	// return false: c is better
-	if (T->ER_id == 355)
-		T = T;
-	double min_var_C = 10000000;
-	double min_pvar_C = 10000000;
+	if (C_no == 0)
+		return true;
+
 	ER_un_t *cur = C;
-	for (int i=0; i<C_no; i++) {
-		double var_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
-		double pvar_c = (cur->ER->to_parent->p - cur->ER->p) * 1.0 / cur->ER->p;
-		if (var_c==0)
-			T = T;
-		if (var_c < min_var_C)
-			min_var_C = var_c;
-		if (pvar_c < min_pvar_C)
-			min_pvar_C = pvar_c;
-		cur = cur->next;
+#if 0
+	// find min_svar_C
+	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	double min_svar_C = 10000000; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double svar_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
+		if (svar_c < min_svar_C) min_svar_C = svar_c;
 	}
 
+	// find min_pvar_C
 	double pvar_T = (T->to_parent) ? ((T->to_parent->p - T->p) * 1.0 / T->p) : 0;
+	double min_pvar_C = 10000000; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double pvar_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
+		if (pvar_c < min_pvar_C) min_pvar_C = pvar_c;
+	}
+#endif
+	// find min_post_C
+	double post_T = calc_postp_by_feat_ar_cp_nh(T);
+	double min_post_C = 10000000; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double post_c = calc_postp_by_feat_ar_cp_nh(cur->ER);
+		if (post_c < min_post_C) min_post_C = post_c;
+	}
 
-	if ((T->to_parent) && (((T->to_parent->ER_size - T->ER_size)*1.0 / T->ER_size) <= min_var_C)) {
-		save_ER(T, 999999);
-		cur = C;
-		for (int i=0; i<C_no; i++) {
-			save_ER(cur->ER, i);
-			cur = cur->next;
-		}
-		
+	// compare var_T with min_var_C
+	if (post_T <= min_post_C) {
+		save_ER(T, T->ER_id);
 		return true;
 	} else
 		return false;
@@ -332,39 +360,42 @@ ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 	if (T->ER_noChild == 0) {
 		// has no child
 
-		/// return single union node T
-		G_td.ER_un[T->ER_id].ER = T;
-		G_td.ER_un[T->ER_id].prev = NULL;
-		G_td.ER_un[T->ER_id].next = NULL;
-		(*C_no_this)++;
-		
-		return &G_td.ER_un[T->ER_id];
+		if (T->ER_size >= G_td.r.min_size) {
+			/// return single union node T
+			G_td.ER_un[T->ER_id].ER = T;
+			G_td.ER_un[T->ER_id].prev = NULL;
+			G_td.ER_un[T->ER_id].next = NULL;
+			(*C_no_this)++;
+			return &G_td.ER_un[T->ER_id];
+		} else {
+			return NULL;
+		}
 	} else if (T->ER_noChild >= 2) {
 		// has more than two children
 		int C_no = 0;
 		ER_un_t *C = NULL, *C_cur = NULL, *C_ret = NULL;
-
 		ER_t *c = T->to_firstChild;
 		while (c) {
 			/// obtain accumulated union C_ret head 
 			C_ret = tree_accumulation(c, &C_no);
 			/// union by linking current union C tail with accumlated union C_ret head
-			if (C_no == 5)
-				C_no = C_no;
-			if (c == T->to_firstChild) {
-				C = C_ret;
-			} else {
-				C_cur->next = C_ret;
-				C_ret->prev = C_cur;
+			if (C_ret != NULL) {
+				if (C == NULL) {
+					C = C_ret;
+				} else {
+					C_cur->next = C_ret;
+					C_ret->prev = C_cur;
+				}
+				ER_un_t *cur = C_ret;
+				while (cur->next)
+					cur = cur->next;
+				C_cur = cur;
 			}
-			ER_un_t *cur = C_ret;
-			while (cur->next)
-				cur = cur->next;
-			C_cur = cur;
 			c = c->to_nextSibling;
 		}
-		if (T->ER_id == 116)
+		if (T->ER_id == 116) {
 			T = T;
+		}
 		if (G_td.ta_algo(T, C_no, C)) {
 			//discard-children(T)
 			T->ER_firstChild = -1;
@@ -594,19 +625,36 @@ void tree_remove_extreme_size_ER(ER_t *v)
 
 void get_ER_candidates(void)
 {
-	/* Remove extreme size */
-	G_td.ER_no_rest = G_td.ER_no;
-	printf("[original] ER rest : %d\n", G_td.ER_no_rest);
-	//tree_remove_extreme_size_ER(&G_td.ERs[G_td.ER_no-1]);
+	/* Hook up boost classifier */
+	CvBoost boost;
+	boost.load("./boost_3fv.xml", "boost");
+	G_td.boost = (CvBoost *)&boost;
 
 	/* Linear reduction */
-	//G_td.lr_algo = linear_reduction_algo_1;
+	G_td.ER_no_rest = G_td.ER_no;
+	printf("[original] ER rest : %d\n", G_td.ER_no_rest);
 	G_td.lr_algo = linear_reduction_algo;
-	//printf("[rm_extrm] ER rest : %d\n", G_td.ER_no_rest);
 	ER_t *root = &G_td.ERs[G_td.ER_no-1];
 	root = linear_reduction(root);
-	//printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
 	
+#if 1
+	/* Calc postp at a time */
+	int m = 0;
+	CvMat* featVector = cvCreateMat(1, 3, CV_32FC1);
+	for (int i=0; i<G_td.ER_no; i++) {
+		if (G_td.ER_no_array[i]) {
+			m++;
+			float ar = (G_td.ERs[i].r - G_td.ERs[i].l + 1) * 1.0 / (G_td.ERs[i].b - G_td.ERs[i].t + 1);  
+			float cp = sqrt((double)G_td.ERs[i].ER_size) * 1.0 / G_td.ERs[i].p;
+			float nh = 1 - G_td.ERs[i].eu;
+			cvSet(featVector, Scalar(ar, cp, nh));
+			float score = boost.predict(featVector, 0, 0, CV_WHOLE_SEQ, false, true);
+			G_td.ERs[i].postp = 1.0/(1+exp(-2*abs(score))); 
+		}
+	}
+	assert(m==G_td.ER_no_rest);
+#endif
+
 #if 0
 	for (int i=0; i<G_td.ER_no; i++) {
 		if (G_td.ER_no_array[i]) {
@@ -624,21 +672,12 @@ void get_ER_candidates(void)
 	ER_un_t *C_union = tree_accumulation(root, &no_union);
 	printf("[tr_accum] ER rest : %d\n", no_union);
 
-	/* Print result */
-#if 1
-	char filepath[100];
-	sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]", G_td.img_id);
-
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
+#if 0
 	ER_un_t *cur = C_union;
-	for (int i=0; i<no_union; i++) {
-		if (cur->ER->ER_size < G_td.r.min_size)
-			continue;
+	for (int i=0; i<no_union; i++, cur = cur->next) {
 		save_ER(cur->ER, i);
 		//plot_ER(&ER_union[i]);
-		cur = cur->next;
 	}
-	free(img_data);
 #endif
 
 }
@@ -798,15 +837,16 @@ int main_sample_3(void)
 	var_type->data.ptr[var_count] = CV_VAR_CATEGORICAL;
 
 	CvBoost boost;
-	boost.train(&featureVectorSamples, CV_ROW_SAMPLE, &classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
-	boost.save("./boost_3fv.xml", "boost");
+	//boost.train(&featureVectorSamples, CV_ROW_SAMPLE, &classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
+	//boost.save("./boost_3fv.xml", "boost");
 
 	// Test boost classifier
-	//boost.load("./boost_3fv.xml", "boost");
-	CvMat testSamples;
-	float ans1, ans2;
+	boost.load("./boost_3fv.xml", "boost");
+	const float awesome_data[3] = {0.111, 0.111, 0.111}; 
+	CvMat testSamples = cv::Mat(1,3,CV_32FC1, (void*)awesome_data);
 
-	cvGetRows(&featureVectorSamples, &testSamples, 1, 2);
+	float ans1, ans2;
+	//cvGetRows(&featureVectorSamples, &testSamples, 1, 2);
 	ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
 	ans2 = boost.predict(&testSamples);
 
@@ -823,7 +863,7 @@ int main(void)
 	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
 	memcpy(&G_td.r, &rules, sizeof(rules_t));
 
-	main_sample_3();
+	main_sample_2();
 #if 0
 		// Boost parameters
 		CvBoostParams bstparams;
