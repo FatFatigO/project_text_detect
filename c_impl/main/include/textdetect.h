@@ -29,6 +29,8 @@ typedef struct ER_un_t
 typedef struct rules_t
 {
 	/* required parameter from user */
+	int text_is_darker;         // = 1 or 0
+	int tree_accum_algo;        // = 1 or 2 or 3
 	double min_reg2img_ratio;   // = 0.001;
 	double max_reg2img_ratio;   // = 0.5
 	double min_ar;              // = 1.2
@@ -52,6 +54,7 @@ typedef struct G_textdetect_t
 {
 	Mat *img;            // current image
 	int img_id;          // current image id
+	char *output_path;   // output path
 	ER_t *ERs;           // ERs
 	int ER_no;           // ER no
 	int ER_no_rest;      // ER no rest
@@ -71,5 +74,7 @@ typedef struct G_textdetect_t
 } G_textdetect_t;
 
 extern G_textdetect_t G_td;
+
+extern void text_detect(Mat *img, int text_is_darker, char *output_path, int algo);
 
 #endif
