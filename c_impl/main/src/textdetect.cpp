@@ -12,13 +12,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include "opencv/ml.h"
-/*
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/nonfree/nonfree.hpp>
-#include <opencv2/nonfree/features2d.hpp>
-#include <opencv2/calib3d/calib3d.hpp> // for homography
-#include <opencv2/imgproc/imgproc.hpp>
-*/
+
 using namespace std;
 using namespace cv;
 
@@ -69,271 +63,6 @@ void save_ER(ER_t *T, int idx)
 	free(img_data);
 }
 
-/*  given ER, calc posterior probability by features (ar,compactness,number of hole) */
-float calc_postp_by_feat_ar_cp_nh(ER_t *T)
-{
-#if 0
-    // aspect ratio
-	float ar = (T->r - T->l + 1) * 1.0 / (T->b - T->t + 1);  
-    // compactness
-	float cp = sqrt((double)T->ER_size) * 1.0 / T->p;
-    // number of holes
-	float nh = 1 - T->eu;
-
-	CvBoost *boost = (CvBoost *)G_td.boost;
-	float data[3] = {ar, cp, nh};
-	CvMat testSamples = cv::Mat(1, 3, CV_32FC1, (void *)data);
-	float score, postp;
-	boost->load("./boost_3fv.xml", "boost");
-	score = boost->predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
-
-	return 1.0/(1+exp(-2*abs(score)));
-#else
-	return T->postp;
-#endif
-}
-
-void calc_incremental_BB(int feat_id_to)
-{
-	// init "from" param
-	p4_t *feat_fr_BB = NULL;
-
-	// init "to" param
-	featraw_t *feat_to = &G_td.featraw[feat_id_to];
-	int pt_to_start_idx = G_td.ERs[feat_id_to].ER_head->pt_order;
-	int pt_to_size = G_td.ERs[feat_id_to].ER_size;
-
-	// init "pt" param
-	p8_t pt;
-	pt.val[0] = (u32)G_td.pts;
-	pt.val[1] = G_td.img->rows;
-	pt.val[2] = G_td.img->cols;
-	pt.val[3] = 0;
-	pt.val[4] = NULL;
-	pt.val[5] = NULL;
-	pt.val[6] = pt_to_start_idx;
-	pt.val[7] = pt_to_size;
-
-	// bounding box
-	get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
-}
-
-
-void calc_incremental_feature_multi(int no_fr, int *feat_id_fr, int feat_id_to)
-{
-	return; ///////////////////////////
-
-	// init "from" param
-	int *pt_fr_start_idx = NULL, *pt_fr_size = NULL;
-	p4_t *feat_fr_BB = NULL;
-	p1_t *feat_fr_PR = NULL, *feat_fr_EN = NULL, *feat_fr_HC = NULL;
-	assert(no_fr>=0);
-	if (no_fr > 0) {
-		pt_fr_start_idx = (int *)malloc(no_fr*sizeof(int));
-		pt_fr_size = (int *)malloc(no_fr*sizeof(int));
-		feat_fr_BB = (p4_t *)malloc(no_fr*sizeof(p4_t));
-		feat_fr_PR = (p1_t *)malloc(no_fr*sizeof(p1_t));
-		feat_fr_EN = (p1_t *)malloc(no_fr*sizeof(p1_t));
-		feat_fr_HC = (p1_t *)malloc(no_fr*sizeof(p1_t));
-		for (int i=0; i<no_fr; i++) {
-			memcpy(&feat_fr_BB[i], &G_td.featraw[feat_id_fr[i]].BB, sizeof(p4_t));
-			memcpy(&feat_fr_PR[i], &G_td.featraw[feat_id_fr[i]].PR, sizeof(p1_t));
-			memcpy(&feat_fr_EN[i], &G_td.featraw[feat_id_fr[i]].EN, sizeof(p1_t));
-			memcpy(&feat_fr_HC[i], &G_td.featraw[feat_id_fr[i]].HC, sizeof(p1_t));
-			feat_fr_HC[i].val[0] = (u32)G_td.featraw[feat_id_fr[i]].HC_buf;
-			pt_fr_start_idx[i] = G_td.ERs[feat_id_fr[i]].ER_head->pt_order;
-			pt_fr_size[i] = G_td.ERs[feat_id_fr[i]].ER_size;
-		}
-	}
-
-	// init "to" param
-	G_td.featraw[feat_id_to].HC_buf = (int *)malloc(G_td.img->rows*sizeof(int));
-	memset((void *)G_td.featraw[feat_id_to].HC_buf, 0, G_td.img->rows*sizeof(int));
-	featraw_t *feat_to = &G_td.featraw[feat_id_to];
-	G_td.featraw[feat_id_to].HC.val[0] = (u32)G_td.featraw[feat_id_to].HC_buf;
-	int pt_to_start_idx = G_td.ERs[feat_id_to].ER_head->pt_order;
-	int pt_to_size = G_td.ERs[feat_id_to].ER_size;
-
-	// init "pt" param
-	p8_t pt;
-	pt.val[0] = (u32)G_td.pts;
-	pt.val[1] = G_td.img->rows;
-	pt.val[2] = G_td.img->cols;
-	pt.val[3] = no_fr;
-	pt.val[4] = (u32)pt_fr_start_idx;
-	pt.val[5] = (u32)pt_fr_size;
-	pt.val[6] = pt_to_start_idx;
-	pt.val[7] = pt_to_size;
-
-	// bounding box
-	//get_BoundingBox(IN &pt, IN feat_fr_BB, OUT &feat_to->BB);
-
-	// perimeter
-	//get_Perimeter(IN &pt, IN feat_fr_PR, OUT &feat_to->PR);
-
-	// euler no
-	//get_EulerNo(IN &pt, IN feat_fr_EN, OUT &feat_to->EN);
-
-	// horizontal crossig
-	get_HzCrossing(IN &pt, IN feat_fr_HC, OUT &feat_to->HC);
-
-	printff("[%d] val %d size %d\n out feature : \n BB:%d,%d,%d,%d\n PR:%d\n EN:%d\n HC:%d,%d,%d,%d\n", 
-		feat_id_to, G_td.ERs[feat_id_to].ER_val, G_td.ERs[feat_id_to].ER_size,
-		feat_to->BB.val[0], feat_to->BB.val[1], feat_to->BB.val[2], feat_to->BB.val[3],
-		feat_to->PR.val[0], feat_to->EN.val[0], *(((int*)feat_to->HC.val[0])+0), *(((int*)feat_to->HC.val[0])+1), *(((int*)feat_to->HC.val[0])+2), *(((int*)feat_to->HC.val[0])+3));
-
-	// relase memory
-	if (no_fr > 0) {
-		free(pt_fr_start_idx);
-		free(pt_fr_size);
-		free(feat_fr_BB);
-		free(feat_fr_PR);
-		free(feat_fr_EN);
-		free(feat_fr_HC);
-	}
-}
-
-bool linear_reduction_algo_1(ER_t *T, ER_t *c)
-{
-	// return true: T is better
-	// return false: c is better
-	if (c->ER_size < G_td.r.min_size) {
-		return true;
-	} else if ((((c->r - c->l + 1)*1.0 / G_td.img->cols) < G_td.r.min_w_reg2img_ratio) ||
-			   (((c->b - c->t + 1)*1.0 / G_td.img->rows) < G_td.r.min_h_reg2img_ratio)) {
-		return true;	   
-	} else if ((((c->r - c->l + 1)*1.0 / G_td.img->cols) > G_td.r.max_w_reg2img_ratio) ||
-			   (((c->b - c->t + 1)*1.0 / G_td.img->rows) > G_td.r.max_h_reg2img_ratio)) {
-		return true;
-	} else if (((T->to_parent->ER_size - T->ER_size)*1.0 / T->ER_size) <
-		       ((c->to_parent->ER_size - c->ER_size)*1.0 / c->ER_size))
-		return true;
-	else
-		return false;
-}
-
-bool tree_accumulation_algo_1(ER_t *T, int C_no, ER_un_t *C)
-{
-	//if var[T] <= min-var[C] then
-	// return true: T is better
-	// return false: c is better
-	if (C_no == 0)
-		return true;
-
-	ER_un_t *cur = C;
-#if 0
-	// find min_svar_C
-	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
-	double min_svar_C = 10000000; cur = C;
-	for (int i=0; i<C_no; i++, cur = cur->next) {
-		double svar_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
-		if (svar_c < min_svar_C) min_svar_C = svar_c;
-	}
-
-	// find min_pvar_C
-	double pvar_T = (T->to_parent) ? ((T->to_parent->p - T->p) * 1.0 / T->p) : 0;
-	double min_pvar_C = 10000000; cur = C;
-	for (int i=0; i<C_no; i++, cur = cur->next) {
-		double pvar_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
-		if (pvar_c < min_pvar_C) min_pvar_C = pvar_c;
-	}
-#endif
-	// find min_post_C
-	double post_T = calc_postp_by_feat_ar_cp_nh(T);
-	double min_post_C = 10000000; cur = C;
-	for (int i=0; i<C_no; i++, cur = cur->next) {
-		double post_c = calc_postp_by_feat_ar_cp_nh(cur->ER);
-		if (post_c < min_post_C) min_post_C = post_c;
-	}
-
-	// compare var_T with min_var_C
-	if (post_T <= min_post_C) {
-		save_ER(T, T->ER_id);
-		return true;
-	} else
-		return false;
-}
-
-bool linear_reduction_algo(ER_t *T, ER_t *c)
-{
-	// Before:        --> "T" --> "c" --> "c's child"
-	// After(True):   --> "T" ----------> "c's child"
-	// After(False):  ----------> "c" --> "c's child"
-	double pvar_T = (T->to_parent) ? ((T->to_parent->p - T->p) * 1.0 / T->p) : 0;
-	double pvar_c = (T->p - c->p) * 1.0 / c->p;
-	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
-	double svar_c = (T->ER_size - c->ER_size) * 1.0 / c->ER_size;
-
-	double lumbda_1 = 1;
-	double lumbda_2 = 1;
-	double var_T = (pvar_T > 0) ? (svar_T + lumbda_1 * pvar_T) : (svar_T + lumbda_2 * pvar_T);
-	double var_c = (pvar_c > 0) ? (svar_c + lumbda_1 * pvar_c) : (svar_c + lumbda_2 * pvar_c);
-
-	if (0){//(T->ER_size > 100) {
-		cout << "T: size var=" << svar_T << endl;
-		cout << "T: peri var=" << pvar_T << endl;
-		plot_ER(T);
-		cout << "c: size var=" << svar_c << endl;
-		cout << "c: peri var=" << pvar_c << endl;
-		plot_ER(c);
-		cout << "T: var=" << var_T << endl;
-		cout << "c: var=" << var_c << endl;
-	}
-
-	if (svar_T <= svar_c) {
-		// T's variance <= c's variance
-		//cout << "T is better!" << endl;
-		//int a;
-		//cin >> a;
-		return true;
-	} else {
-		// T's variance > c's variance
-		//cout << "c is better!" << endl;
-		//int a;
-		//cin >> a;
-		return false;
-	}
-}
-bool linear_reduction_algo2(ER_t *T, ER_t *c)
-{
-	// "T" --> "c" --> "c's child"
-	if ((T->to_parent) &&
-		((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size <=
-	     (T->ER_size - c->ER_size) * 1.0 / c->ER_size)) {
-		// T's variance <= c's variance
-		if (0) {//(T->ER_size > 100) {
-			if (T->p > 9999)
-				T = T;
-			cout << "T: size var=" << (T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size << endl;
-			cout << "T: peri var=" << (T->to_parent->p - T->p) * 1.0 / T->p << " " << T->p << "->" << T->to_parent->p << endl;
-			plot_ER(T);
-			cout << "c: size var=" << (T->ER_size - c->ER_size) * 1.0 / c->ER_size << endl;
-			cout << "c: peri var=" << (T->p - c->p) * 1.0 / c->p << " " << c->p << "->" << T->p << endl;
-			cout << "T is better!" << endl;
-			plot_ER(c);
-		}
-
-		return true;
-	} else {
-		// T's variance > c's variance
-		if (0) {//(T->ER_size > 100) {
-			cout << "T: size var=" << (T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size << endl;
-			cout << "T: peri var=" << (T->to_parent->p - T->p) * 1.0 / T->p << " " << T->p << "->" << T->to_parent->p << endl;
-			plot_ER(T);
-			cout << "c: size var=" << (T->ER_size - c->ER_size) * 1.0 / c->ER_size << endl;
-			cout << "c: peri var=" << (T->p - c->p) * 1.0 / c->p << " " << c->p << "->" << T->p << endl;
-			cout << "c is better!" << endl;
-			plot_ER(c);
-		}
-		return false;
-	}
-}
-bool tree_accumulation_algo(ER_t *T, int C_no, ER_t **C)
-{
-	//if var[T] <= min-var[C] then
-	return false;//true;
-}
-
 /*
 procedure TREE-ACCUMULATION(T)
 2: if nchildren[T] >= 2 then
@@ -353,23 +82,124 @@ procedure TREE-ACCUMULATION(T)
 end procedure
 */
 
+/* Use size variace with aspect ratio penalty */
+bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
+{
+	//if var[T] <= min-var[C] then
+	// return true: T is better
+	// return false: c is better
+	if (C_no == 0)
+		return true;
+	ER_un_t *cur = C;
+	T->ar = (T->r - T->l + 1) * 1.0 / (T->b - T->t + 1); 
+
+	// find min_svar_wp_C (with penalty)
+	double svar_wp_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	if (T->ar > G_td.r.max_ar)
+		svar_wp_T = svar_wp_T - (G_td.r.large_ar_pnty_coef) * (T->ar - G_td.r.max_ar);
+	else if (T->ar < G_td.r.min_ar)
+		svar_wp_T = svar_wp_T - (G_td.r.small_ar_pnty_coef) * (G_td.r.max_ar - T->ar);
+	double min_svar_wp_C = 10000000; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double svar_wp_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
+		if (cur->ER->ar > G_td.r.max_ar)
+			svar_wp_c = svar_wp_c - (G_td.r.large_ar_pnty_coef) * (cur->ER->ar - G_td.r.max_ar);
+		else if (cur->ER->ar < G_td.r.min_ar)
+			svar_wp_c = svar_wp_c - (G_td.r.small_ar_pnty_coef) * (G_td.r.max_ar - cur->ER->ar);
+
+		if (svar_wp_c < min_svar_wp_C) min_svar_wp_C = svar_wp_c;
+	}
+
+	// compare var_T with min_var_C
+	if (min_svar_wp_C < svar_wp_T)
+		return false;
+	else
+		return true;
+}
+
+/* Use posterior prob first then size variace */
+bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
+{
+	//if var[T] <= min-var[C] then
+	// return true: T is better
+	// return false: c is better
+	if (C_no == 0)
+		return true;
+	ER_un_t *cur = C;
+
+	// find min_svar_C
+	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	double min_svar_C = 10000000; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double svar_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
+		if (svar_c < min_svar_C) min_svar_C = svar_c;
+	}
+
+	// find max_post_C
+	double post_T = T->postp;//calc_postp_by_feat_ar_cp_nh(T);
+	double max_post_C = 0; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double post_c = cur->ER->postp;
+		if (post_c >= max_post_C) max_post_C = post_c;
+	}
+
+	// compare var_T with min_var_C
+	if (post_T >= max_post_C) {
+		if (min_svar_C < svar_T) 
+			return false;
+		else
+			return true;
+	} else
+		return false;
+}
+
+/* Size variace with aspect ratio penalty */
+bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
+{
+	//if var[T] <= min-var[C] then
+	// return true: T is better
+	// return false: c is better
+	if (C_no == 0)
+		return true;
+	ER_un_t *cur = C;
+
+	// find min_svar_wp_C (with penalty)
+	double svar_wp_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	if (T->ar > G_td.r.max_ar)
+		svar_wp_T = svar_wp_T - (G_td.r.large_ar_pnty_coef) * (T->ar - G_td.r.max_ar);
+	else if (T->ar < G_td.r.min_ar)
+		svar_wp_T = svar_wp_T - (G_td.r.small_ar_pnty_coef) * (G_td.r.max_ar - T->ar);
+	double min_svar_wp_C = 10000000; cur = C;
+	for (int i=0; i<C_no; i++, cur = cur->next) {
+		double svar_wp_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
+		if (cur->ER->ar > G_td.r.max_ar)
+			svar_wp_c = svar_wp_c - (G_td.r.large_ar_pnty_coef) * (cur->ER->ar - G_td.r.max_ar);
+		else if (cur->ER->ar < G_td.r.min_ar)
+			svar_wp_c = svar_wp_c - (G_td.r.small_ar_pnty_coef) * (G_td.r.max_ar - cur->ER->ar);
+
+		if (svar_wp_c < min_svar_wp_C) min_svar_wp_C = svar_wp_c;
+	}
+
+	if (min_svar_wp_C > svar_wp_T)
+		return false;
+	else
+		return true;
+	//if (/*((post_T - max_post_C) < 0.001) && */(min_svar_C < svar_T))
+}
+
 ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 {
-	if (T->ER_id == 86)
-		T = T;
+	if (T->ER_size < G_td.r.min_size)
+		return NULL;
 	if (T->ER_noChild == 0) {
 		// has no child
+		/// return single union node T
+		G_td.ER_un[T->ER_id].ER = T;
+		G_td.ER_un[T->ER_id].prev = NULL;
+		G_td.ER_un[T->ER_id].next = NULL;
+		(*C_no_this)++;
+		return &G_td.ER_un[T->ER_id];
 
-		if (T->ER_size >= G_td.r.min_size) {
-			/// return single union node T
-			G_td.ER_un[T->ER_id].ER = T;
-			G_td.ER_un[T->ER_id].prev = NULL;
-			G_td.ER_un[T->ER_id].next = NULL;
-			(*C_no_this)++;
-			return &G_td.ER_un[T->ER_id];
-		} else {
-			return NULL;
-		}
 	} else if (T->ER_noChild >= 2) {
 		// has more than two children
 		int C_no = 0;
@@ -393,16 +223,16 @@ ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 			}
 			c = c->to_nextSibling;
 		}
-		if (T->ER_id == 116) {
-			T = T;
+		int T_is_better = 0;
+		if ((T->ER_size <= G_td.r.max_size) && (G_td.ta_algo(T, C_no, C))) {
+			T_is_better = 1;
 		}
-		if (G_td.ta_algo(T, C_no, C)) {
-			//discard-children(T)
+		if (T_is_better) {
+			// discard-children(T)
 			T->ER_firstChild = -1;
 			T->to_firstChild = NULL;
-			//return T
 
-			/// return single union node T
+			// return single union node T
 			G_td.ER_un[T->ER_id].ER = T;
 			G_td.ER_un[T->ER_id].prev = NULL;
 			G_td.ER_un[T->ER_id].next = NULL;
@@ -410,9 +240,7 @@ ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 
 			return &G_td.ER_un[T->ER_id];
 		} else {
-			//return C
-
-			/// return current union head node C
+			// return current union head node C
 			(*C_no_this) += C_no;
 			return C;
 		}
@@ -444,47 +272,37 @@ procedure LINEAR-REDUCTION(T)
 end procedure
 */
 
+bool linear_reduction_algo(ER_t *T, ER_t *c)
+{
+	// Before:        --> "T" --> "c" --> "c's child"
+	// After(True):   --> "T" ----------> "c's child"
+	// After(False):  ----------> "c" --> "c's child"
+	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	double svar_c = (T->ER_size - c->ER_size) * 1.0 / c->ER_size;
+	if (svar_T <= svar_c) {
+		// T's variance <= c's variance
+		return true;
+	} else {
+		// T's variance > c's variance
+		return false;
+	}
+}
+
 ER_t *linear_reduction(ER_t *T)
 {
-	int a = T->ER_id;
-#if 0
-	if (T->ER_size > 100) {
-		cout << a << endl;
-		plot_ER(T);
-		ER_t *cur = T->to_firstChild;
-		/*
-		while(cur) {
-			if (cur->ER_size > 100)
-				plot_ER(cur);
-			cur = cur->to_nextSibling;
-		}*/
+	// mark invalid for extream size ER
+	if ((T->ER_size < G_td.r.min_size) || (T->ER_size > G_td.r.max_size)) {
+		G_td.ER_no_array[T->ER_id] = 0;
 	}
-#endif
+
 	if (T->ER_noChild == 0) {
 		// has no child
-		printff("[%d] has no child, return %d\n",a,T->ER_id);
-
-		/* ---------------------------- START ---------------------------------*/
-		// <====== Feature extraction (in/crementally computed from Null => T)
-		calc_incremental_feature_multi(0, NULL, T->ER_id);
-		/* ----------------------------- END ----------------------------------*/
-		if ((T->ER_size < G_td.r.min_size) && (!(T->to_nextSibling) && !(T->to_prevSibling)))
-			T = T;
 		return T;
 	} else if (T->ER_noChild == 1) {
 		// has only one child
 		G_td.ER_no_rest--;
-		printff("[%d] %d has one child\n",a,T->ER_id);
-		printff("[%d] %d go linear reduction \n",a,T->to_firstChild->ER_id);
 		ER_t *c = linear_reduction(T->to_firstChild);
-		printff("[%d] %d returned from linear reduction \n",a,c->ER_id);
 		if (G_td.lr_algo(T,c)){
-			/* ---------------------------- START ---------------------------------*/
-			// Feature extraction (incrementally computed from T->firstChild => T)
-			int *fr_id = &T->to_firstChild->ER_id;
-			calc_incremental_feature_multi(1, fr_id, T->ER_id);
-			/* ----------------------------- END ----------------------------------*/
-
 			// remove c, link T to its new child, "c's child"
 			T->ER_noChild = c->ER_noChild;
 			T->ER_firstChild = c->ER_firstChild;
@@ -495,26 +313,18 @@ ER_t *linear_reduction(ER_t *T)
 				t->to_parent = T;
 				t = t->to_nextSibling;
 			}
-			printff("[%d] link %d to its new child %d\n",a,T->ER_id,c->ER_firstChild);
-			printff("[%d] return %d \n",a,T->ER_id);
 			G_td.ER_no_array[c->ER_id] = 0;
 			return T; // T is better
 		} else {
-			printff("[%d] return %d \n",a,c->ER_id);
 			G_td.ER_no_array[T->ER_id] = 0;
 			return c; // c is better
 		}
 	} else {
 		// has more than two children
-		printff("[%d] %d has more than two child\n",a,T->ER_id);
 		ER_t *c = T->to_firstChild;
 		int childNo = 0;
 		while (c) {
-			printff("[%d] %d go linear reduction \n",a,c->ER_id);
-
 			ER_t *d = linear_reduction(c);
-
-			printff("[%d] %d returned from linear reduction \n",a,d->ER_id);
 			// link T to its new child "d"
 			childNo++;
 			if ((T->ER_firstChild!=d->ER_id) && (c->ER_id!=d->ER_id)) {
@@ -544,90 +354,18 @@ ER_t *linear_reduction(ER_t *T)
 				d->ER_parent = T->ER_id;
 				d->to_parent = T;
 			}
-			printff("[%d] link %d to its new child %d\n",a,T->ER_id,d->ER_id);
 			// next T's child
 			c = c->to_nextSibling;
 		}
-		printff("[%d] return %d \n",a,T->ER_id);
-
-		/* ---------------------------- START ---------------------------------*/
-		// Feature extraction (incrementally computed from T->firstChild => T)
-		int *fr_id = (int *)malloc(childNo*sizeof(int));
-		c = T->to_firstChild;
-		for (int i=0; i<T->ER_noChild; i++) {
-			fr_id[i] = c->ER_id;
-			c = c->to_nextSibling;
-		}
-		calc_incremental_feature_multi(T->ER_noChild, fr_id, T->ER_id);
-		free(fr_id);
-		/* ----------------------------- END ----------------------------------*/
-
 		return T;
 	}
 }
-
-void tree_remove_extreme_size_ER(ER_t *v)
-{
-	ER_t *d = v->to_firstChild;
-	while (d) {
-		tree_remove_extreme_size_ER(d);
-		ER_t *c = d;
-		d = d->to_nextSibling;
-
-		//visit each ER;
-		if ((c->ER_size < G_td.r.min_size) ||
-			(((c->r - c->l + 1)*1.0 / G_td.img->cols) < G_td.r.min_w_reg2img_ratio) ||
-			(((c->b - c->t + 1)*1.0 / G_td.img->rows) < G_td.r.min_h_reg2img_ratio)) {
-			// remove node c
-			// (1) parent related
-			if (c->to_parent) {
-				if (c->to_parent->ER_firstChild==c->ER_id) {
-					if (c->to_nextSibling) {
-						c->to_parent->ER_firstChild = c->ER_nextSibling;
-						c->to_parent->to_firstChild = c->to_nextSibling;
-					} else {
-						c->to_parent->ER_firstChild = -1;
-						c->to_parent->to_firstChild = NULL;
-					}
-				}
-				c->ER_parent = -1;
-				c->to_parent = NULL;
-			}
-			// (2) sibling related
-			if (c->to_nextSibling) {
-				c->to_nextSibling->ER_prevSibling = -1;
-				c->to_nextSibling->to_prevSibling = NULL;
-				c->ER_nextSibling = -1;
-				c->to_nextSibling = NULL;
-			}
-			if (c->to_prevSibling) {
-				c->to_prevSibling->ER_nextSibling = -1;
-				c->to_prevSibling->to_nextSibling = NULL;
-				c->ER_prevSibling = -1;
-				c->to_prevSibling = NULL;
-			}
-			// (3) child related
-			if (c->ER_noChild == 0) {
-				// has no child
-			} else if (c->ER_noChild == 1) {
-				// has only one child
-			} else {
-				// has more than two children
-			}
-			c->ER_noChild = 0;
-			// (4) invalid ER
-			INVALID_ER(c);
-			G_td.ER_no_rest--;
-		}
-	}
-}
-
 
 void get_ER_candidates(void)
 {
 	/* Hook up boost classifier */
 	CvBoost boost;
-	boost.load("./boost_3fv.xml", "boost");
+	boost.load("./boost_4fv.xml", "boost");
 	G_td.boost = (CvBoost *)&boost;
 
 	/* Linear reduction */
@@ -636,46 +374,91 @@ void get_ER_candidates(void)
 	G_td.lr_algo = linear_reduction_algo;
 	ER_t *root = &G_td.ERs[G_td.ER_no-1];
 	root = linear_reduction(root);
-	
+
 #if 1
 	/* Calc postp at a time */
 	int m = 0;
-	CvMat* featVector = cvCreateMat(1, 3, CV_32FC1);
+	CvMat* featVector = cvCreateMat(1, 4, CV_32FC1);
 	for (int i=0; i<G_td.ER_no; i++) {
 		if (G_td.ER_no_array[i]) {
 			m++;
+			/* prepare features (1~3) : aspect ratio, compactness, no of holes */
 			float ar = (G_td.ERs[i].r - G_td.ERs[i].l + 1) * 1.0 / (G_td.ERs[i].b - G_td.ERs[i].t + 1);  
 			float cp = sqrt((double)G_td.ERs[i].ER_size) * 1.0 / G_td.ERs[i].p;
 			float nh = 1 - G_td.ERs[i].eu;
-			cvSet(featVector, Scalar(ar, cp, nh));
+			/* prepare feature (4) : median of horizontal crossing */
+			int h = G_td.ERs[i].b - G_td.ERs[i].t + 1;
+			int w = G_td.ERs[i].r - G_td.ERs[i].l + 1;
+			float h1 = floor(h*1.0/6);
+			float h2 = floor(h*3.0/6);
+			float h3 = floor(h*5.0/6);
+			int hc1 = 0, hc2 = 0, hc3 = 0;
+			LinkedPoint *cur = G_td.ERs[i].ER_head;
+			memset(G_td.hc1, 0, G_td.img->cols*sizeof(u8));
+			memset(G_td.hc2, 0, G_td.img->cols*sizeof(u8));
+			memset(G_td.hc3, 0, G_td.img->cols*sizeof(u8));
+			for (int k=0; k<G_td.ERs[i].ER_size; k++, cur=cur->next) {
+				if (cur->pt.y == h1)
+					G_td.hc1[cur->pt.x] = 1;
+				if (cur->pt.y == h2)
+					G_td.hc2[cur->pt.x] = 1;
+				if (cur->pt.y == h3)
+					G_td.hc3[cur->pt.x] = 1;
+			}
+			for (int k=0; k<w-1; k++) {
+				if (G_td.hc1[k] + G_td.hc1[k+1] == 1) hc1++;
+				if (G_td.hc2[k] + G_td.hc2[k+1] == 1) hc2++;
+				if (G_td.hc3[k] + G_td.hc3[k+1] == 1) hc3++;
+			}
+			int hc[3];
+			hc[0] = hc1 + (G_td.hc1[0] + G_td.hc1[w-1]);
+			hc[1] = hc2 + (G_td.hc2[0] + G_td.hc2[w-1]);
+			hc[2] = hc3 + (G_td.hc3[0] + G_td.hc3[w-1]);
+			for (int k=2; k>0; k--) {
+				for (int j=2; j>0; j--) {
+					if (hc[j]<hc[j-1]) {
+						int tmp = hc[j-1];
+						hc[j-1] = hc[j];
+						hc[j] = tmp;
+					}
+				}
+			}
+			// calc posterior probability
+			featVector->data.fl[0] = ar;
+			featVector->data.fl[1] = cp;
+			featVector->data.fl[2] = nh;
+			featVector->data.fl[3] = hc[1]; // median
 			float score = boost.predict(featVector, 0, 0, CV_WHOLE_SEQ, false, true);
-			G_td.ERs[i].postp = 1.0/(1+exp(-2*abs(score))); 
+			G_td.ERs[i].label = (score>=0) ? 1 : -1;
+			G_td.ERs[i].postp = 1.0/(1+exp(-2.0*abs(score)));
+			G_td.ERs[i].ar = ar;
 		}
 	}
-	assert(m==G_td.ER_no_rest);
+	//assert(m==G_td.ER_no_rest);
 #endif
 
 #if 0
 	for (int i=0; i<G_td.ER_no; i++) {
 		if (G_td.ER_no_array[i]) {
-			if (G_td.ERs[i].ER_size < G_td.r.min_size)
+			if (G_td.ERs[i].ER_id > 10000)
 				continue;
-			save_ER(&G_td.ERs[i], i);
+			save_ER(&G_td.ERs[i], G_td.ERs[i].ER_id);
 		}
 	}
 #endif
+	//return;
 
 	/* Tree accumulation */
 	int no_union = 0;
 	printf("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
-	G_td.ta_algo = tree_accumulation_algo_1;
+	G_td.ta_algo = tree_accumulation_algo1;
 	ER_un_t *C_union = tree_accumulation(root, &no_union);
 	printf("[tr_accum] ER rest : %d\n", no_union);
 
-#if 0
+#if 1
 	ER_un_t *cur = C_union;
 	for (int i=0; i<no_union; i++, cur = cur->next) {
-		save_ER(cur->ER, i);
+		save_ER(cur->ER, cur->ER->ER_id);
 		//plot_ER(&ER_union[i]);
 	}
 #endif
@@ -702,10 +485,13 @@ void main_sample_2(void)
 		if (0) {
 			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
 		} else {
-			double percent = 5;
+			double percent = 100;
 			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 			//IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
-			IplImage *src = cvLoadImage("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
+			//IplImage *src = cvLoadImage("PICT0034_Syn.JPG", CV_LOAD_IMAGE_GRAYSCALE); //BUS(syn)
+			//IplImage *src = cvLoadImage("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); //BUS
+			IplImage *src = cvLoadImage("dPICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); //H319810
+			//IplImage *src = cvLoadImage("test02.JPG", CV_LOAD_IMAGE_GRAYSCALE); //Citizen
 			//IplImage *src = cvLoadImage("SMALL_S.png", CV_LOAD_IMAGE_GRAYSCALE);
 			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100), (int)((src->height*percent)/100) ), src->depth, src->nChannels);
 			//IplImage *dst = cvCreateImage(cvSize(200, 200), src->depth, src->nChannels);
@@ -714,8 +500,12 @@ void main_sample_2(void)
 			//cvNamedWindow("a");
 			//cvShowImage("a", dst);
 			//cvWaitKey(0);
+			char filepath[100];
+			sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/_originl.jpg", ii);
+			cvSaveImage(filepath, dst);
 		}
-		printf("Time taken: %.2fs (size %d x %d)\n", (double)(clock() - tStart)/CLOCKS_PER_SEC, img.cols, img.rows); tStart = clock();
+		//printf("Load image (size %d x %d) ...\n", img.cols, img.rows);
+		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
 
 		G_td.img = &img;
 		G_td.img_id = ii;
@@ -738,6 +528,12 @@ void main_sample_2(void)
 		memset(G_td.ER_no_array, 1 , ER_no*sizeof(u8));
 		G_td.ER_un = (ER_un_t *)malloc(ER_no*sizeof(ER_un_t));
 		memset(G_td.ER_un, 0 , ER_no*sizeof(ER_un_t));
+		G_td.r.max_size = G_td.r.max_reg2img_ratio * img.cols * img.rows;//from ratio to real size
+		G_td.r.min_size = G_td.r.min_reg2img_ratio * img.cols * img.rows;//from ratio to real size
+		G_td.r.min_size = MAX(G_td.r.min_size, 64);
+		G_td.hc1 = (u8 *)malloc(img.cols*sizeof(u8));
+		G_td.hc2 = (u8 *)malloc(img.cols*sizeof(u8));
+		G_td.hc3 = (u8 *)malloc(img.cols*sizeof(u8));
 
 		// get ER candidates
 		get_ER_candidates();
@@ -754,68 +550,6 @@ void main_sample_2(void)
 		char ch;
 		scanf("%c", &ch);
 	}
-}
-
-int main_sample_1(void) 
-{
-	// get image
-#if 0
-	int img_cols = 4;
-	int img_rows = 4;
-	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
-	u8* img_ptr = img_data;
-	img_ptr[0] =  1; img_ptr[1] =  2; img_ptr[2] =  3; img_ptr[3] =  1;
-	img_ptr[4] =  2; img_ptr[5] =  2; img_ptr[6] =  3; img_ptr[7] =  2;
-	img_ptr[8] =  3; img_ptr[9] =  3; img_ptr[10] = 3; img_ptr[11] = 2;
-	img_ptr[12] = 1; img_ptr[13] = 2; img_ptr[14] = 3; img_ptr[15] = 4;
-#elif 1
-	int img_cols = 3;
-	int img_rows = 3;
-	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
-	u8* img_ptr = img_data;
-	img_ptr[0] = 253; img_ptr[1] = 254; img_ptr[2] = 252;
-	img_ptr[3] = 254; img_ptr[4] = 254; img_ptr[5] = 252;
-	img_ptr[6] = 252; img_ptr[7] = 252; img_ptr[8] = 253; 
-#else
-	int img_cols = 5;
-	int img_rows = 3;
-	u8* img_data = (u8*)malloc(img_cols*img_rows*sizeof(u8));
-	u8* img_ptr = img_data;
-	img_ptr[0] = 109; img_ptr[1] =  58; img_ptr[2] =  34; img_ptr[3] = 144; img_ptr[4] =  66;
-	img_ptr[5] = 205; img_ptr[6] = 205; img_ptr[7] = 205; img_ptr[8] = 132; img_ptr[9] = 181;
-	img_ptr[10]= 159; img_ptr[11]= 172; img_ptr[12]= 108; img_ptr[13]= 205; img_ptr[14]= 205;
-#endif
-	Mat img;
-	img.rows = img_rows;
-	img.cols = img_cols;
-	int img_step = img_cols;
-
-	// get ERs
-	ER_t* ERs = (ER_t *)malloc(img_rows*img_cols*sizeof(ERs[0]));
-	LinkedPoint* pts = (LinkedPoint*)malloc((img_rows*img_cols+1)*sizeof(pts[0]));
-	int ER_no = get_ERs(img_data, img_rows, img_cols, img_step, 0/*2:see debug msg*/, ERs, pts);
-
-	// assign some global variables
-	G_td.img = &img;
-	G_td.ERs = ERs;
-	G_td.ER_no = ER_no;
-	G_td.pts = pts;
-
-	// prepare for getting ER candidates
-	G_td.featraw = (featraw_t *)malloc(ER_no*sizeof(featraw_t));
-	memset(G_td.featraw, 0, ER_no*sizeof(featraw_t));
-
-	// get ER candidates
-	get_ER_candidates();
-
-	printf("main_sample_1 test is good\n");
-	char ch;
-	scanf("%c", &ch);
-
-	free(ERs);
-	free(pts);
-	
-	return 0;
 }
 
 int main_sample_3(void)
@@ -838,10 +572,10 @@ int main_sample_3(void)
 
 	CvBoost boost;
 	//boost.train(&featureVectorSamples, CV_ROW_SAMPLE, &classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
-	//boost.save("./boost_3fv.xml", "boost");
+	//boost.save("./boost_4fv.xml", "boost");
 
 	// Test boost classifier
-	boost.load("./boost_3fv.xml", "boost");
+	boost.load("./boost_4fv.xml", "boost");
 	const float awesome_data[3] = {0.111, 0.111, 0.111}; 
 	CvMat testSamples = cv::Mat(1,3,CV_32FC1, (void*)awesome_data);
 
@@ -860,64 +594,17 @@ int main_sample_3(void)
 
 int main(void)
 {
-	rules_t rules = {10, 0.0019, 0.4562, 0.0100, 0.7989};
-	memcpy(&G_td.r, &rules, sizeof(rules_t));
+	G_td.r.min_reg2img_ratio = 0.001;
+	G_td.r.max_reg2img_ratio = 0.25;
+	G_td.r.min_ar = 0.7;
+	G_td.r.max_ar =	1.2;
+	G_td.r.small_ar_pnty_coef = 0.08;
+	G_td.r.large_ar_pnty_coef = 0.03;
+
+	//rules_t rules = {0.001, 0.5, 0.0019, 0.4562, 0.0100, 0.7989, 0.2, 0.1};
+	//memcpy(&G_td.r, &rules, sizeof(rules_t));
 
 	main_sample_2();
-#if 0
-		// Boost parameters
-		CvBoostParams bstparams;
-		bstparams.boost_type = CvBoost::REAL;
-		bstparams.weak_count = 100;
-		bstparams.weight_trim_rate = 0.95;
-		bstparams.split_criteria = CvBoost::DEFAULT;
-
-		// Run the training
-		CvBoost *boost = new CvBoost;
-		boost.train(featureVectorSamples, 
-					CV_ROW_SAMPLE, 
-					classLabelResponses, 
-					0, 0, var_type, 
-					0, bstparams);
-#endif
-
-#if 0
-	char input[128];
-	FILE *fin;
-	fin = fopen(, "r");
-	fscanf(fin, "%s", input);
-	int img_no = atoi(input);
-
-	char path_prefix[10] = "../../../";
-	for (int i=1; i<=img_no; i++)
-	{
-		fscanf(fin, "%s", input);
-		IplImage *img=cvLoadImage(strcat(path_prefix, input));
-
-		cvtColor(img, grayImg, CV_BGR2GRAY);
-		int a = 0;
-
-	}
-
-	if (file) {
-		while (fscanf(file, "%s", str)!=EOF)
-			printf("%s",str);
-		fclose(file);
-	}
-
-	IplImage *img=cvLoadImage("../../../../../../Dataset/MSRA-TD500/test/IMG_0059.JPG");
-	cvNamedWindow("a");
-	cvShowImage("a", img);
-	cvWaitKey(0);
-	//CvMat img = imread("aPICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
-
-	//int* out = (int*)malloc( (img.rows*img.cols*3)*sizeof(int) );
-	//int* pxl = (int*)malloc( (img.rows*img.cols)*sizeof(int) );
-	//get_ERs(&img, out, pxl, 0);
-
-	//struct aa a;
-#endif
-	//fclose(fin);
 
 	return 0;
 }

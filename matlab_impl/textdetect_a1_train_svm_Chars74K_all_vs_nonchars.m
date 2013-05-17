@@ -203,8 +203,8 @@ if bitand(stage3,bin2dec('100'))>0
     lb = true(size(fv,1),1);
     lb(end-n_nonc+1:end) = false;
     
-    if 0 % used for obtaining .yml file for opencv
-       fv_save = fv(:,1:3);
+    if 1 % used for obtaining .yml file for opencv
+       fv_save = fv(:,1:4);
        lb_save = lb;
        util_mat2yml(fv_save, [path.FEATVEC_MAT 'fv.yml'], 'w');
        util_mat2yml(lb_save, [path.FEATVEC_MAT 'fv.yml'], 'a');

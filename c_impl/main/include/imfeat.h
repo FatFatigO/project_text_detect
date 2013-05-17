@@ -52,6 +52,9 @@ typedef struct ER_t
 	int p;       // perimeter
 	int eu;      // euler no
 	float postp; // posterior prob
+	int label;   // classified label
+	float ar;    // aspect ratio
+	float var_wp;// variance with penalty
 
 	/* free to use after get_ERs */
 	int val;

@@ -777,19 +777,3 @@ int get_ERs(
 
 	return _get_ERs(&img, ERs, pts, reverse);
 }
-
-/*
-void ER_tree_traversal(ER_t *v)
-{
-	ER_t *c = v->to_firstChild;
-	while (c) {
-		ER_tree_traversal(c);
-		
-		// visit v as follows
-		//printf("ER_id %d is visited\n", c->ER_id);
-		//visit_each_ER(v);
-
-		c = c->to_nextSibling;
-	}
-}
-*/
