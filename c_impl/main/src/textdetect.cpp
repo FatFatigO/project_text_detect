@@ -62,8 +62,9 @@ void save_ER(ER_t *T, int idx)
 	char filepath[100], filename[64];
 	int pathlen = strlen(G_td.output_path);
 	sprintf(filename, "%05d.jpg", idx);
-	strcpy(&G_td.output_path[pathlen], filename);
-	cvSaveImage(G_td.output_path, dst);
+	strcpy(filepath, G_td.output_path);
+	strcpy(&filepath[pathlen], filename);
+	cvSaveImage(filepath, dst);
 
 	free(img_data);
 }
