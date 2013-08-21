@@ -631,10 +631,3 @@ int main(void)
 
 	return 0;
 }
-
-int main(void)
-{
-	main_sample_2();
-
-	return 0;
-}
