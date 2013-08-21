@@ -315,14 +315,28 @@ MSERMergeComp( MSERConnectedComp* comp1,
 	comp->head = head;
 	comp->tail = tail;
 	comp->history = history;
-	comp->size = comp1->size + comp2->size;
-	comp->l = MIN(comp1->l, comp2->l);
-	comp->t = MIN(comp1->t, comp2->t);
-	comp->r = MAX(comp1->r, comp2->r);
-	comp->b = MAX(comp1->b, comp2->b);
 	comp->p = comp1->p + comp2->p;
 	comp->eu = comp1->eu + comp2->eu;
-	
+	if ((comp1->size > 0) && (comp2->size > 0)) {
+		comp->l = MIN(comp1->l, comp2->l);
+		comp->t = MIN(comp1->t, comp2->t);
+		comp->r = MAX(comp1->r, comp2->r);
+		comp->b = MAX(comp1->b, comp2->b);
+	} else {
+		if (comp2->size == 0) {
+			comp->l = comp1->l;
+			comp->t = comp1->t;
+			comp->r = comp1->r;
+			comp->b = comp1->b;
+		} else {
+			comp->l = comp2->l;
+			comp->t = comp2->t;
+			comp->r = comp2->r;
+			comp->b = comp2->b;
+		}
+	}	
+	comp->size = comp1->size + comp2->size;
+
 	debug_print("update hst %d val=%d(x) size=%d(x) ER_val=%d(v) ER_size=%d(v) comp2_size=%d in MSERMergeComp <========== \n", 
 		history-G_imf_er.hist_start, history->val, history->size, history->ER_val, history->ER_size, comp2->size);
 }

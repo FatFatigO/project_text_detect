@@ -61,7 +61,8 @@ void save_ER(ER_t *T, int idx)
 	//cvSaveImage(filepath, dst);
 	char filepath[100], filename[64];
 	int pathlen = strlen(G_td.output_path);
-	sprintf(filename, "%05d.jpg", idx);
+	//sprintf(filename, "%05d.jpg", idx);
+	sprintf(filename, "[%d]%d-%d-%d-%d.jpg", G_td.r.text_is_darker, T->l, T->t, T->r, T->b);
 	strcpy(filepath, G_td.output_path);
 	strcpy(&filepath[pathlen], filename);
 	cvSaveImage(filepath, dst);
@@ -584,11 +585,11 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
 
 	// get ERs
 	ER_t *ERs = (ER_t *)malloc(img->rows*img->cols*sizeof(ERs[0]));
+	G_td.ERs = ERs;
 	LinkedPoint *pts = (LinkedPoint*)malloc((img->rows*img->cols+1)*sizeof(pts[0]));
 	int ER_no = get_ERs(img->data, img->rows, img->cols, *(img->step.buf), !G_td.r.text_is_darker/*2:see debug msg*/, ERs, pts);
 
 	// assign some global variables
-	G_td.ERs = ERs;
 	G_td.ER_no = ER_no;
 	G_td.pts = pts;
 
@@ -619,9 +620,21 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
 
 int main(void)
 {
-	Mat img = imread("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); //BUS
-	char out[100] = "../../";
-	text_detect(&img, 1, out, 1);
+	//Sign under treess
+	//Mat img = imread("PICT0017.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
+	//char out[100] = "../../test/PICT0017/"; 
+	
+	//BUS
+	Mat img = imread("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
+	char out[100] = "../../test/PICT0034/";
+	text_detect(&img, 1, out, 3);
+
+	return 0;
+}
+
+int main(void)
+{
+	main_sample_2();
 
 	return 0;
 }
