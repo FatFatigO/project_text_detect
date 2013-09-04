@@ -43,7 +43,7 @@ void plot_ER(ER_t *T)
 }
 
 /* save utility function */
-void save_ER(ER_t *T, int idx)
+void save_ER(ER_t *T, int idx, FILE *f)
 {
 	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
 	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
@@ -62,11 +62,15 @@ void save_ER(ER_t *T, int idx)
 	char filepath[100], filename[64];
 	int pathlen = strlen(G_td.output_path);
 	//sprintf(filename, "%05d.jpg", idx);
-	sprintf(filename, "[%d]%d-%d-%d-%d.jpg", G_td.r.text_is_darker, T->l, T->t, T->r, T->b);
+#if 1
+	fprintf(f, "%d	%d	%d	%d	%c\n", T->l, T->t, T->r-T->l+1, T->b-T->t+1, G_td.channel);
+#else
+	sprintf(filename, "[%d][%c][%04d-%04d-%04d-%04d][%d].jpg", 
+		G_td.img_id, G_td.channel, T->l, T->t, T->r-T->l+1, T->b-T->t+1, G_td.r.text_is_darker);
 	strcpy(filepath, G_td.output_path);
 	strcpy(&filepath[pathlen], filename);
 	cvSaveImage(filepath, dst);
-
+#endif
 	free(img_data);
 }
 
@@ -464,10 +468,15 @@ void get_ER_candidates(void)
 	printff("[tr_accum] ER rest : %d\n", no_union);
 
 #if 1
+	
+	char fn[64];
+	sprintf(fn, "%s%03d.txt", G_td.output_path, G_td.img_id);
+	FILE *f = fopen(fn, "a");
 	ER_un_t *cur = C_union;
 	for (int i=0; i<no_union; i++, cur = cur->next) {
-		save_ER(cur->ER, cur->ER->ER_id);
+		save_ER(cur->ER, cur->ER->ER_id, f);
 	}
+	fclose(f);
 #endif
 
 }
@@ -566,9 +575,11 @@ int main_sample_3(void)
 }
 #endif
 
-void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
+void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int cur_img_id, char cur_channel)
 {
 	G_td.img = img;                                // input image
+	G_td.channel = cur_channel;                    // current channel name
+	G_td.img_id = cur_img_id;                      // current image id
 	G_td.output_path = output_path;                // output folder path
 	G_td.r.text_is_darker = text_is_darker;        // text is darker than background or not
 	G_td.r.tree_accum_algo = algo;                 // 1,2,3
@@ -618,16 +629,65 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
 	free(G_td.featraw);
 }
 
+void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
+{
+	int cur_img_id = 0;
+	char cur_channel = ' ';
+	text_detect(img, text_is_darker, output_path, algo, cur_img_id, cur_channel);
+}
+
 int main(void)
 {
-	//Sign under treess
-	//Mat img = imread("PICT0017.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
-	//char out[100] = "../../test/PICT0017/"; 
-	
-	//BUS
+
+#if 0
+	//Sign on the street
+	Mat img = imread("PICT0017.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
+	char out[100] = "../../test/PICT0017/"; 
+	text_detect(&img, 0, out, 1);
+		//BUS
 	Mat img = imread("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
 	char out[100] = "../../test/PICT0034/";
 	text_detect(&img, 1, out, 3);
+#else
+	
+
+	//cvShowImage("src", src);
+	//cvShowImage("dst", dst);
+	//cvShowImage("y", &(IplImage)yy);
+	//cvShowImage("u", &(IplImage)uu);
+	//cvShowImage("v", &(IplImage)vv);
+	//cvWaitKey(0);
+	
+	int algo = 1;
+	int img_id = 0;
+
+	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest/";
+	char out[100] = "../../../../../../../LargeFiles/ICDAR_2013/";
+	for (int img_id = 4; img_id<=233; img_id++) {
+		
+		char fn[128];
+		sprintf(fn, "%simg_%d.jpg", in, img_id);
+		IplImage* src = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		IplImage* dst = cvCloneImage(src);
+		cvCvtColor(src, dst, CV_RGB2YUV);
+		CvSize s = cvGetSize(dst);
+		IplImage *y = cvCreateImage(s,IPL_DEPTH_8U,CV_8UC1),
+				 *u = cvCreateImage(s,IPL_DEPTH_8U,CV_8UC1),
+				 *v = cvCreateImage(s,IPL_DEPTH_8U,CV_8UC1); 
+		cvSplit(dst, y, u, v, NULL);
+		Mat yy = Mat(y,0);
+		Mat uu = Mat(u,0);
+		Mat vv = Mat(v,0);
+
+		text_detect(&yy, 0, out, algo, img_id, 'y');
+		text_detect(&yy, 1, out, algo, img_id, 'y');
+		text_detect(&uu, 0, out, algo, img_id, 'u');
+		text_detect(&uu, 1, out, algo, img_id, 'u');
+		text_detect(&vv, 0, out, algo, img_id, 'v');
+		text_detect(&vv, 1, out, algo, img_id, 'v');
+	}
+
+#endif
 
 	return 0;
 }
