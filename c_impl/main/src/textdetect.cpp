@@ -24,7 +24,8 @@ G_textdetect_t G_td;
 /* plot utility function */
 void plot_ER(ER_t *T)
 {
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
+	assert(img_data != NULL);
 	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
 	LinkedPoint *cur = T->ER_head;
 	for (int j=0; j<T->ER_size; j++) {
@@ -45,7 +46,9 @@ void plot_ER(ER_t *T)
 /* save utility function */
 void save_ER(ER_t *T, int idx, FILE *f)
 {
+	/*
 	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
+	assert(img_data != NULL);
 	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
 	LinkedPoint *cur = T->ER_head;
 	for (int j=0; j<T->ER_size; j++) {
@@ -55,7 +58,7 @@ void save_ER(ER_t *T, int idx, FILE *f)
 	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
 	IplImage *dst = cvCreateImage(size, 8, 1);
 	dst->imageData = (char *)img_data;
-
+	*/
 	//char filepath[100];
 	//sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/%05d.jpg", G_td.img_id, idx);
 	//cvSaveImage(filepath, dst);
@@ -63,7 +66,12 @@ void save_ER(ER_t *T, int idx, FILE *f)
 	int pathlen = strlen(G_td.output_path);
 	//sprintf(filename, "%05d.jpg", idx);
 #if 1
-	fprintf(f, "%d	%d	%d	%d	%c\n", T->l, T->t, T->r-T->l+1, T->b-T->t+1, G_td.channel);
+	fprintf(f, "%d	%d	%d	%d	%c\n", 
+		(int)((T->l)*1.0/G_td.resize_ratio),
+		(int)((T->t)*1.0/G_td.resize_ratio), 
+		(int)((T->r-T->l+1)*1.0/G_td.resize_ratio), 
+		(int)((T->b-T->t+1)*1.0/G_td.resize_ratio), 
+		G_td.channel);
 #else
 	sprintf(filename, "[%d][%c][%04d-%04d-%04d-%04d][%d].jpg", 
 		G_td.img_id, G_td.channel, T->l, T->t, T->r-T->l+1, T->b-T->t+1, G_td.r.text_is_darker);
@@ -71,7 +79,7 @@ void save_ER(ER_t *T, int idx, FILE *f)
 	strcpy(&filepath[pathlen], filename);
 	cvSaveImage(filepath, dst);
 #endif
-	free(img_data);
+	//free(img_data);
 }
 
 /*
@@ -575,7 +583,7 @@ int main_sample_3(void)
 }
 #endif
 
-void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int cur_img_id, char cur_channel)
+void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int cur_img_id, char cur_channel, float resize_ratio)
 {
 	G_td.img = img;                                // input image
 	G_td.channel = cur_channel;                    // current channel name
@@ -583,6 +591,7 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int 
 	G_td.output_path = output_path;                // output folder path
 	G_td.r.text_is_darker = text_is_darker;        // text is darker than background or not
 	G_td.r.tree_accum_algo = algo;                 // 1,2,3
+	G_td.resize_ratio = resize_ratio;              // resize ratio
 	
 	/* The following are default value, can be changed here */
 	G_td.r.min_reg2img_ratio = 0.001;              // min region to img ratio
@@ -596,8 +605,10 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int 
 
 	// get ERs
 	ER_t *ERs = (ER_t *)malloc(img->rows*img->cols*sizeof(ERs[0]));
+	assert(ERs != NULL);
 	G_td.ERs = ERs;
 	LinkedPoint *pts = (LinkedPoint*)malloc((img->rows*img->cols+1)*sizeof(pts[0]));
+	assert(pts != NULL);
 	int ER_no = get_ERs(img->data, img->rows, img->cols, *(img->step.buf), !G_td.r.text_is_darker/*2:see debug msg*/, ERs, pts);
 
 	// assign some global variables
@@ -606,10 +617,13 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int 
 
 	// prepare for getting ER candidates
 	G_td.featraw = (featraw_t *)malloc(ER_no*sizeof(featraw_t));
+	assert(G_td.featraw != NULL);
 	memset(G_td.featraw, 0, ER_no*sizeof(featraw_t));
 	G_td.ER_no_array = (u8 *)malloc(ER_no*sizeof(u8));
+	assert(G_td.ER_no_array != NULL);
 	memset(G_td.ER_no_array, 1 , ER_no*sizeof(u8));
 	G_td.ER_un = (ER_un_t *)malloc(ER_no*sizeof(ER_un_t));
+	assert(G_td.ER_un != NULL);
 	memset(G_td.ER_un, 0 , ER_no*sizeof(ER_un_t));
 	G_td.r.max_size = G_td.r.max_reg2img_ratio * img->cols * img->rows;//from ratio to real size
 	G_td.r.min_size = G_td.r.min_reg2img_ratio * img->cols * img->rows;//from ratio to real size
@@ -617,6 +631,9 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int 
 	G_td.hc1 = (u8 *)malloc(img->cols*sizeof(u8));
 	G_td.hc2 = (u8 *)malloc(img->cols*sizeof(u8));
 	G_td.hc3 = (u8 *)malloc(img->cols*sizeof(u8));
+	assert(G_td.hc1 != NULL);
+	assert(G_td.hc2 != NULL);
+	assert(G_td.hc3 != NULL);
 
 	// get ER candidates
 	get_ER_candidates();
@@ -633,60 +650,71 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
 {
 	int cur_img_id = 0;
 	char cur_channel = ' ';
-	text_detect(img, text_is_darker, output_path, algo, cur_img_id, cur_channel);
+	float resize_ratio = 1.0;
+	text_detect(img, text_is_darker, output_path, algo, cur_img_id, cur_channel, resize_ratio);
 }
 
 int main(void)
 {
 
-#if 0
-	//Sign on the street
-	Mat img = imread("PICT0017.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
-	char out[100] = "../../test/PICT0017/"; 
-	text_detect(&img, 0, out, 1);
-		//BUS
-	Mat img = imread("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
-	char out[100] = "../../test/PICT0034/";
-	text_detect(&img, 1, out, 3);
-#else
-	
-
-	//cvShowImage("src", src);
-	//cvShowImage("dst", dst);
-	//cvShowImage("y", &(IplImage)yy);
-	//cvShowImage("u", &(IplImage)uu);
-	//cvShowImage("v", &(IplImage)vv);
-	//cvWaitKey(0);
-	
-	int algo = 1;
-	int img_id = 0;
+#if 1
+	int algo = 3;
+	int img_id = 4;
+	int max_width = 1600;
+	float resize_ratio = 1.0;
 
 	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest/";
 	char out[100] = "../../../../../../../LargeFiles/ICDAR_2013/";
-	for (int img_id = 4; img_id<=233; img_id++) {
-		
-		char fn[128];
+	char fn[128];
+
+	for (int img_id = 205; img_id <= 233; img_id++) {
+
 		sprintf(fn, "%simg_%d.jpg", in, img_id);
-		IplImage* src = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
-		IplImage* dst = cvCloneImage(src);
-		cvCvtColor(src, dst, CV_RGB2YUV);
-		CvSize s = cvGetSize(dst);
-		IplImage *y = cvCreateImage(s,IPL_DEPTH_8U,CV_8UC1),
-				 *u = cvCreateImage(s,IPL_DEPTH_8U,CV_8UC1),
-				 *v = cvCreateImage(s,IPL_DEPTH_8U,CV_8UC1); 
-		cvSplit(dst, y, u, v, NULL);
+		CvSize size;
+
+		IplImage *img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		if (img->width > max_width) {
+			resize_ratio = max_width*1.0 / img->width;
+			size = cvSize(max_width, (int)img->height*resize_ratio);
+			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
+			cvResize(img, img_rs);
+			cvReleaseImage(&img);
+			img = img_rs;
+		} else {
+			size = cvGetSize(img);
+		}
+		IplImage *y = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
+				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
+				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
+		cvSplit(img, y, u, v, NULL);
+		cvReleaseImage(&img);
 		Mat yy = Mat(y,0);
 		Mat uu = Mat(u,0);
 		Mat vv = Mat(v,0);
 
-		text_detect(&yy, 0, out, algo, img_id, 'y');
-		text_detect(&yy, 1, out, algo, img_id, 'y');
-		text_detect(&uu, 0, out, algo, img_id, 'u');
-		text_detect(&uu, 1, out, algo, img_id, 'u');
-		text_detect(&vv, 0, out, algo, img_id, 'v');
-		text_detect(&vv, 1, out, algo, img_id, 'v');
-	}
+		text_detect(&yy, 0, out, algo, img_id, 'y', resize_ratio);
+		text_detect(&yy, 1, out, algo, img_id, 'y', resize_ratio);
+		text_detect(&uu, 0, out, algo, img_id, 'u', resize_ratio);
+		text_detect(&uu, 1, out, algo, img_id, 'u', resize_ratio);
+		text_detect(&vv, 0, out, algo, img_id, 'v', resize_ratio);
+		text_detect(&vv, 1, out, algo, img_id, 'v', resize_ratio);
 
+		yy.release();
+		uu.release();
+		vv.release();
+		cvReleaseImage(&y);
+		cvReleaseImage(&u);
+		cvReleaseImage(&v);
+	}
+#else
+	//Sign on the street
+	Mat img = imread("PICT0017.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
+	char out[100] = "../../test/PICT0017/"; 
+	text_detect(&img, 0, out, 1);
+	//BUS
+	Mat img = imread("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
+	char out[100] = "../../test/PICT0034/";
+	text_detect(&img, 1, out, 3);
 #endif
 
 	return 0;

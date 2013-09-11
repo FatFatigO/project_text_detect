@@ -54,6 +54,7 @@ typedef struct G_textdetect_t
 {
 	Mat *img;            // current image
 	int img_id;          // current image id
+	float resize_ratio;  // resize ratio (dst/src)
 	char channel;        // current channeld
 	char *output_path;   // output path
 	ER_t *ERs;           // ERs

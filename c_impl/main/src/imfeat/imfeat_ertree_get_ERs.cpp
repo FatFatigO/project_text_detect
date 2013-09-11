@@ -648,6 +648,7 @@ int _get_ERs(
 	// to speedup the process, make the width to be 2^N
 	CvMat img;// = cvCreateMat( src->rows+2, step, CV_32SC1 );
 	int* img_data = (int*)malloc((src->rows+2)*step*sizeof(int));
+	assert(img_data != NULL);
 	img.rows = src->rows+2;
 	img.cols = step;
 	img.step = step;
@@ -659,11 +660,13 @@ int _get_ERs(
 
 	// pre-allocate boundary heap
 	int** heap = (int **)malloc((src->rows*src->cols+256)*sizeof(heap[0]));
+	assert(heap != NULL);
 	int** heap_start[256];
 	heap_start[0] = heap;
 
 	// pre-allocate point map buffer, used for assigning pts' l,r,t,b
 	LinkedPoint *pts_map = (LinkedPoint *)malloc((src->rows+2)*step*sizeof(LinkedPoint *));
+	assert(pts_map != NULL);
 	memset(pts_map, 0, (src->rows+2)*step*sizeof(LinkedPoint *));
 	for (int i=0; i<(src->rows*src->cols); i++) {
 		ERs[i].val = -1;
@@ -685,6 +688,7 @@ int _get_ERs(
 	G_imf_er.img_cols = src->cols;
 	G_imf_er.img_rows = src->rows;
 	G_imf_er.ptsmap = (u8 *)malloc((src->cols+2)*(src->rows+2)*sizeof(u8));
+	assert(G_imf_er.ptsmap != NULL);
 	memset(G_imf_er.ptsmap, 0, (src->cols+2)*(src->rows+2)*sizeof(u8));
 
 	// darker to brighter (MSER-)
