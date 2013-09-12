@@ -1,5 +1,4 @@
 
-#if 0
 #include "../include/system.h"
 #include "../include/imfeat.h"
 #include "../include/textdetect.h"
@@ -19,11 +18,8 @@ using namespace cv;
 
 #define printff if(0)printf //printf
 
-/* global variable */
-G_textdetect_t G_td;
-
 /* plot utility function */
-void plot_ER(ER_t *T)
+static void plot_ER(ER_t *T)
 {
 	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
 	assert(img_data != NULL);
@@ -45,7 +41,7 @@ void plot_ER(ER_t *T)
 }
 
 /* save utility function */
-void save_ER(ER_t *T, int idx, FILE *f)
+static void save_ER(ER_t *T, int idx, FILE *f)
 {
 	/*
 	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
@@ -68,11 +64,11 @@ void save_ER(ER_t *T, int idx, FILE *f)
 	//sprintf(filename, "%05d.jpg", idx);
 #if 1
 	fprintf(f, "%d	%d	%d	%d	%c\n", 
-		(int)((T->l)*1.0/G_td.resize_ratio),
-		(int)((T->t)*1.0/G_td.resize_ratio), 
-		(int)((T->r-T->l+1)*1.0/G_td.resize_ratio), 
-		(int)((T->b-T->t+1)*1.0/G_td.resize_ratio), 
-		G_td.channel);
+		(int)((T->l)*1.0/G_td.img_resize_ratio),
+		(int)((T->t)*1.0/G_td.img_resize_ratio), 
+		(int)((T->r-T->l+1)*1.0/G_td.img_resize_ratio), 
+		(int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio), 
+		G_td.img_chan);
 #else
 	sprintf(filename, "[%d][%c][%04d-%04d-%04d-%04d][%d].jpg", 
 		G_td.img_id, G_td.channel, T->l, T->t, T->r-T->l+1, T->b-T->t+1, G_td.r.text_is_darker);
@@ -103,7 +99,7 @@ end procedure
 */
 
 /* Use size variace with aspect ratio penalty */
-bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
+static bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
@@ -139,7 +135,7 @@ bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
 }
 
 /* Use posterior prob first then size variace */
-bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
+static bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
@@ -175,7 +171,7 @@ bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
 }
 
 /* Size variace with aspect ratio penalty */
-bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
+static bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
@@ -209,7 +205,7 @@ bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
 		return true;
 }
 
-ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
+static ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 {
 	if (T->ER_size < G_td.r.min_size)
 		return NULL;
@@ -294,7 +290,7 @@ procedure LINEAR-REDUCTION(T)
 end procedure
 */
 
-bool linear_reduction_algo(ER_t *T, ER_t *c)
+static bool linear_reduction_algo(ER_t *T, ER_t *c)
 {
 	// Before:        --> "T" --> "c" --> "c's child"
 	// After(True):   --> "T" ----------> "c's child"
@@ -310,7 +306,7 @@ bool linear_reduction_algo(ER_t *T, ER_t *c)
 	}
 }
 
-ER_t *linear_reduction(ER_t *T)
+static ER_t *linear_reduction(ER_t *T)
 {
 	// mark invalid for extream size ER
 	if ((T->ER_size < G_td.r.min_size) || (T->ER_size > G_td.r.max_size)) {
@@ -383,7 +379,7 @@ ER_t *linear_reduction(ER_t *T)
 	}
 }
 
-void get_ER_candidates(void)
+static void get_ER_candidates(void)
 {
 	/* Hook up boost classifier */
 	CvBoost boost;
@@ -490,109 +486,14 @@ void get_ER_candidates(void)
 
 }
 
-#if 0
-void main_sample_2(void)
-{
-	string path_prefix = "../../";
-	string path_filelist = path_prefix + "../../../Dataset/MSRA-TD500/test/parsed_filenames.txt";
-	ifstream fin(path_filelist);
-	int img_no;
-
-	fin >> img_no;
-	for (int ii=1; ii<=img_no; ii++)
-	{
-		clock_t tStart = clock();
-		
-		// get image
-		char path_img[128];
-		fin >> path_img;
-		Mat img;
-		if (0) {
-			img = imread(path_prefix + path_img, CV_LOAD_IMAGE_GRAYSCALE);
-		} else {
-			double percent = 100;
-			//IplImage *src = cvLoadImage((path_prefix + path_img).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-			//IplImage *src = cvLoadImage("../../../../../Dataset/ICDAR_Robust_Reading/SceneTrialTest/ryoungt_05.08.2002/PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE);
-			//IplImage *src = cvLoadImage("PICT0034_Syn.JPG", CV_LOAD_IMAGE_GRAYSCALE); //BUS(syn)
-			//IplImage *src = cvLoadImage("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); //BUS
-			//IplImage *src = cvLoadImage("dPICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); //H319810
-			//IplImage *src = cvLoadImage("test02.JPG", CV_LOAD_IMAGE_GRAYSCALE); //Citizen
-			IplImage *src = cvLoadImage("dpCT0001.JPG", CV_LOAD_IMAGE_GRAYSCALE); // YAMAHA
-			IplImage *dst = cvCreateImage(cvSize((int)((src->width*percent)/100), (int)((src->height*percent)/100) ), src->depth, src->nChannels);
-			//IplImage *dst = cvCreateImage(cvSize(200, 200), src->depth, src->nChannels);
-			cvResize(src, dst, CV_INTER_LINEAR);
-			img = dst;
-			//cvNamedWindow("a");
-			//cvShowImage("a", dst);
-			//cvWaitKey(0);
-			char filepath[100];
-			sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/_originl.jpg", ii);
-			cvSaveImage(filepath, dst);
-		}
-		//printf("Load image (size %d x %d) ...\n", img.cols, img.rows);
-		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
-
-		char out[100];
-		sprintf(out,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/", ii);
-		text_detect(&img, 1, out, 1);
-
-		printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC); tStart = clock();
-
-		printf("[%d] main_sample_2 test is good\n", ii);
-		char ch;
-		scanf("%c", &ch);
-	}
-}
-
-int main_sample_3(void)
-{
-	// Train boost classifier
-	Mat featureVectorSample;
-	Mat classLabelResponse;
-	string demoFile = "../../../../../Codes/_output_files/Feature_vectors/fv.yml";
-	FileStorage fsDemo(demoFile, FileStorage::READ);
-	fsDemo["fv_save"] >> featureVectorSample;
-	fsDemo["lb_save"] >> classLabelResponse;
-	int var_count = featureVectorSample.cols;
-	int nsamples_all = featureVectorSample.rows;
-	CvMat featureVectorSamples = featureVectorSample;
-	CvMat classLabelResponses = classLabelResponse;
-
-	CvMat* var_type = cvCreateMat(var_count + 1, 1, CV_8U);
-	cvSet(var_type, cvScalarAll(CV_VAR_ORDERED)); // Inits all to 0 like the code below
-	var_type->data.ptr[var_count] = CV_VAR_CATEGORICAL;
-
-	CvBoost boost;
-	//boost.train(&featureVectorSamples, CV_ROW_SAMPLE, &classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
-	//boost.save("./boost_4fv.xml", "boost");
-
-	// Test boost classifier
-	boost.load("./boost_4fv.xml", "boost");
-	const float awesome_data[3] = {0.111, 0.111, 0.111}; 
-	CvMat testSamples = cv::Mat(1,3,CV_32FC1, (void*)awesome_data);
-
-	float ans1, ans2;
-	//cvGetRows(&featureVectorSamples, &testSamples, 1, 2);
-	ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
-	ans2 = boost.predict(&testSamples);
-
-	cvGetRows(&featureVectorSamples, &testSamples, 3000, 3001);
-	ans1 = boost.predict(&testSamples, 0, 0, CV_WHOLE_SEQ, false, true);
-	ans2 = boost.predict(&testSamples);
-
-	return 0;
-}
-#endif
-
-void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int cur_img_id, char cur_channel, float resize_ratio)
+void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo)
 {
 	G_td.img = img;                                // input image
-	G_td.channel = cur_channel;                    // current channel name
-	G_td.img_id = cur_img_id;                      // current image id
-	G_td.output_path = output_path;                // output folder path
+	G_td.img_chan = img_chan;                      // image channel name
+	G_td.img_id = img_id;                          // image id
+	G_td.img_resize_ratio = img_resize_ratio;      // resize ratio
 	G_td.r.text_is_darker = text_is_darker;        // text is darker than background or not
 	G_td.r.tree_accum_algo = algo;                 // 1,2,3
-	G_td.resize_ratio = resize_ratio;              // resize ratio
 	
 	/* The following are default value, can be changed here */
 	G_td.r.min_reg2img_ratio = 0.001;              // min region to img ratio
@@ -647,77 +548,11 @@ void text_detect(Mat *img, int text_is_darker, char *output_path, int algo, int 
 	free(G_td.featraw);
 }
 
-void text_detect(Mat *img, int text_is_darker, char *output_path, int algo)
+void generate_ER_candidates(Mat *img, int text_is_darker, int algo)
 {
-	int cur_img_id = 0;
-	char cur_channel = ' ';
-	float resize_ratio = 1.0;
-	text_detect(img, text_is_darker, output_path, algo, cur_img_id, cur_channel, resize_ratio);
+	int img_id = 0;
+	char img_chan = ' ';
+	float img_resize_ratio = 1.0;
+	generate_ER_candidates(img, img_id, img_chan, img_resize_ratio, text_is_darker, algo);
 }
 
-int main(void)
-{
-
-#if 1
-	int algo = 3;
-	int img_id = 4;
-	int max_width = 1600;
-	float resize_ratio = 1.0;
-
-	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest/";
-	char out[100] = "../../../../../../../LargeFiles/ICDAR_2013/";
-	char fn[128];
-
-	for (int img_id = 205; img_id <= 233; img_id++) {
-
-		sprintf(fn, "%simg_%d.jpg", in, img_id);
-		CvSize size;
-
-		IplImage *img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
-		if (img->width > max_width) {
-			resize_ratio = max_width*1.0 / img->width;
-			size = cvSize(max_width, (int)img->height*resize_ratio);
-			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
-			cvResize(img, img_rs);
-			cvReleaseImage(&img);
-			img = img_rs;
-		} else {
-			size = cvGetSize(img);
-		}
-		IplImage *y = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
-		cvSplit(img, y, u, v, NULL);
-		cvReleaseImage(&img);
-		Mat yy = Mat(y,0);
-		Mat uu = Mat(u,0);
-		Mat vv = Mat(v,0);
-
-		text_detect(&yy, 0, out, algo, img_id, 'y', resize_ratio);
-		text_detect(&yy, 1, out, algo, img_id, 'y', resize_ratio);
-		text_detect(&uu, 0, out, algo, img_id, 'u', resize_ratio);
-		text_detect(&uu, 1, out, algo, img_id, 'u', resize_ratio);
-		text_detect(&vv, 0, out, algo, img_id, 'v', resize_ratio);
-		text_detect(&vv, 1, out, algo, img_id, 'v', resize_ratio);
-
-		yy.release();
-		uu.release();
-		vv.release();
-		cvReleaseImage(&y);
-		cvReleaseImage(&u);
-		cvReleaseImage(&v);
-	}
-#else
-	//Sign on the street
-	Mat img = imread("PICT0017.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
-	char out[100] = "../../test/PICT0017/"; 
-	text_detect(&img, 0, out, 1);
-	//BUS
-	Mat img = imread("PICT0034.JPG", CV_LOAD_IMAGE_GRAYSCALE); 
-	char out[100] = "../../test/PICT0034/";
-	text_detect(&img, 1, out, 3);
-#endif
-
-	return 0;
-}
-#endif

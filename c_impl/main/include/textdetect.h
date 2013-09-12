@@ -52,31 +52,34 @@ typedef struct rules_t
 // Global variable structure
 typedef struct G_textdetect_t
 {
-	Mat *img;            // current image
-	int img_id;          // current image id
-	float resize_ratio;  // resize ratio (dst/src)
-	char channel;        // current channeld
-	char *output_path;   // output path
-	ER_t *ERs;           // ERs
-	int ER_no;           // ER no
-	int ER_no_rest;      // ER no rest
-	u8 *ER_no_array;     // ER no array
-	ER_un_t *ER_un;      // ER union after tree accumulation
-	LinkedPoint *pts;    // points
-	featraw_t *featraw;  // raw feature for each ER
-	rules_t r;           // rule constants
-	void *boost;         // boost classifier
-	u8 *hc1;             // used for horizontal crossing feature
+	// shared info
+	Mat *img;                // current image
+	int img_id;              // current image id
+	float img_resize_ratio;  // resize ratio (dst/src)
+	char img_chan;           // current image channeld
+	char *input_path;        // input path
+	char *output_path;       // output path
+
+	// used by generate_ER_candidates only
+	ER_t *ERs;               // ERs
+	int ER_no;               // ER no
+	int ER_no_rest;          // ER no rest
+	u8 *ER_no_array;         // ER no array
+	ER_un_t *ER_un;          // ER union after tree accumulation
+	LinkedPoint *pts;        // points
+	featraw_t *featraw;      // raw feature for each ER
+	rules_t r;               // rule constants
+	void *boost;             // boost classifier
+	u8 *hc1;                 // used for horizontal crossing feature
 	u8 *hc2;
 	u8 *hc3;
-
-	bool (*lr_algo)(ER_t *, ER_t *);              // linear-reduction algo
+	bool (*lr_algo)(ER_t *, ER_t *);            // linear-reduction algo
 	bool (*ta_algo)(ER_t *, int, ER_un_t *);    // tree-accumulation algo
-
 } G_textdetect_t;
 
 extern G_textdetect_t G_td;
 
-extern void text_detect(Mat *img, int text_is_darker, char *output_path, int algo);
+extern void generate_ER_candidates(Mat *img, int text_is_darker, int algo);
+extern void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo);
 
 #endif
