@@ -26,7 +26,6 @@
     <ClCompile Include="..\..\main\src\imfeat\imfeat_ertree_get_ERs.cpp" />
     <ClCompile Include="..\..\main\src\imfeat\imfeat_util.cpp" />
     <ClCompile Include="..\..\main\src\main.cpp" />
-    <ClCompile Include="..\..\main\src\textdetect.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{45F8AF89-AD0C-4383-8D42-89903CEBF229}</ProjectGuid>

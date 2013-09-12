@@ -1,4 +1,3 @@
-
 #include "../include/system.h"
 #include "../include/imfeat.h"
 #include "../include/textdetect.h"
@@ -17,67 +16,6 @@ using namespace std;
 using namespace cv;
 
 #define printff if(0)printf //printf
-
-/* plot utility function */
-static void plot_ER(ER_t *T)
-{
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
-	assert(img_data != NULL);
-	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
-	LinkedPoint *cur = T->ER_head;
-	for (int j=0; j<T->ER_size; j++) {
-		img_data[cur->pt.y*(*G_td.img->step.p)+cur->pt.x] = 255;
-		cur = cur->next;
-	}
-	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
-	IplImage *dst = cvCreateImage(size, 8, 1);
-	dst->imageData = (char *)img_data;
-
-	cvNamedWindow("a");
-	cvShowImage("a", dst);
-	cvWaitKey(0);
-
-	free(img_data);
-}
-
-/* save utility function */
-static void save_ER(ER_t *T, int idx, FILE *f)
-{
-	/*
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
-	assert(img_data != NULL);
-	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
-	LinkedPoint *cur = T->ER_head;
-	for (int j=0; j<T->ER_size; j++) {
-		img_data[cur->pt.y*(*G_td.img->step.p)+cur->pt.x] = 255;
-		cur = cur->next;
-	}
-	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
-	IplImage *dst = cvCreateImage(size, 8, 1);
-	dst->imageData = (char *)img_data;
-	*/
-	//char filepath[100];
-	//sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/%05d.jpg", G_td.img_id, idx);
-	//cvSaveImage(filepath, dst);
-	char filepath[100], filename[64];
-	int pathlen = strlen(G_td.output_path);
-	//sprintf(filename, "%05d.jpg", idx);
-#if 1
-	fprintf(f, "%d	%d	%d	%d	%c\n", 
-		(int)((T->l)*1.0/G_td.img_resize_ratio),
-		(int)((T->t)*1.0/G_td.img_resize_ratio), 
-		(int)((T->r-T->l+1)*1.0/G_td.img_resize_ratio), 
-		(int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio), 
-		G_td.img_chan);
-#else
-	sprintf(filename, "[%d][%c][%04d-%04d-%04d-%04d][%d].jpg", 
-		G_td.img_id, G_td.channel, T->l, T->t, T->r-T->l+1, T->b-T->t+1, G_td.r.text_is_darker);
-	strcpy(filepath, G_td.output_path);
-	strcpy(&filepath[pathlen], filename);
-	cvSaveImage(filepath, dst);
-#endif
-	//free(img_data);
-}
 
 /*
 procedure TREE-ACCUMULATION(T)
@@ -99,7 +37,7 @@ end procedure
 */
 
 /* Use size variace with aspect ratio penalty */
-static bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
+bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
@@ -135,7 +73,7 @@ static bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
 }
 
 /* Use posterior prob first then size variace */
-static bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
+bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
@@ -171,7 +109,7 @@ static bool tree_accumulation_algo2(ER_t *T, int C_no, ER_un_t *C)
 }
 
 /* Size variace with aspect ratio penalty */
-static bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
+bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
 {
 	//if var[T] <= min-var[C] then
 	// return true: T is better
@@ -205,7 +143,7 @@ static bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
 		return true;
 }
 
-static ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
+ER_un_t *tree_accumulation(ER_t *T, int *C_no_this)
 {
 	if (T->ER_size < G_td.r.min_size)
 		return NULL;
@@ -290,7 +228,7 @@ procedure LINEAR-REDUCTION(T)
 end procedure
 */
 
-static bool linear_reduction_algo(ER_t *T, ER_t *c)
+bool linear_reduction_algo(ER_t *T, ER_t *c)
 {
 	// Before:        --> "T" --> "c" --> "c's child"
 	// After(True):   --> "T" ----------> "c's child"
@@ -306,7 +244,7 @@ static bool linear_reduction_algo(ER_t *T, ER_t *c)
 	}
 }
 
-static ER_t *linear_reduction(ER_t *T)
+ER_t *linear_reduction(ER_t *T)
 {
 	// mark invalid for extream size ER
 	if ((T->ER_size < G_td.r.min_size) || (T->ER_size > G_td.r.max_size)) {
@@ -379,7 +317,76 @@ static ER_t *linear_reduction(ER_t *T)
 	}
 }
 
-static void get_ER_candidates(void)
+/* Draw ER rectangle in original image and save as jpg */
+void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
+{
+	char fn[128];
+	IplImage *img;
+
+	// check if output image exist
+	int file_exist = 0;
+	sprintf(fn, "%s/%03d.jpg", G_td.output_path, G_td.img_id);
+	if (FILE * file = fopen(fn, "r")) {
+        fclose(file);
+        file_exist = 1;
+    }
+	if (file_exist) {
+		// load from output path
+		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+	} else {
+		// load from original image path
+		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, G_td.img_id);
+		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		// and save it first
+		sprintf(fn, "%s/%03d.jpg", G_td.output_path, G_td.img_id);
+		cvSaveImage(fn, img);
+	}
+
+	// draw rect
+	CvScalar color;
+	if (G_td.img_chan == 'y')
+		color = CV_RGB(255, 0, 0);
+	else if (G_td.img_chan == 'u')
+		color = CV_RGB(0, 255, 0);
+	else
+		color = CV_RGB(0, 0, 255);
+	for (int i=0; i<no_union; i++, cur=cur->next) {
+		ER_t *T = cur->ER;
+		cvRectangle(img, cvPoint(T->l*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), 
+						 cvPoint(T->r*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), color, 2);
+		cvRectangle(img, cvPoint(T->r*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), 
+						 cvPoint(T->r*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), color, 2);
+		cvRectangle(img, cvPoint(T->r*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), 
+						 cvPoint(T->l*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), color, 2);
+		cvRectangle(img, cvPoint(T->l*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), 
+						 cvPoint(T->l*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), color, 2);
+	}
+	
+	// save image
+	sprintf(fn, "%s/%03d.jpg", G_td.output_path, G_td.img_id);
+	cvSaveImage(fn, img);
+	cvReleaseImage(&img);
+}
+
+/* Save ERs as text file */
+void save_ER_as_text_file(ER_un_t *cur, int no_union)
+{
+	char fn[64];
+	sprintf(fn, "%s/%03d.txt", G_td.output_path, G_td.img_id);
+	FILE *f = fopen(fn, "a");
+	for (int i=0; i<no_union; i++, cur=cur->next) {
+		ER_t *T = cur->ER;
+		fprintf(f, "%d	%d	%d	%d	%c\n", 
+		(int)((T->l)*1.0/G_td.img_resize_ratio),
+		(int)((T->t)*1.0/G_td.img_resize_ratio), 
+		(int)((T->r-T->l+1)*1.0/G_td.img_resize_ratio), 
+		(int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio), 
+		G_td.img_chan);
+	}
+	fclose(f);
+}
+
+void get_ER_candidates(void)
 {
 	/* Hook up boost classifier */
 	CvBoost boost;
@@ -453,15 +460,6 @@ static void get_ER_candidates(void)
 			}
 		}
 	}
-#if 0
-	for (int i=0; i<G_td.ER_no; i++) {
-		if (G_td.ER_no_array[i]) {
-			if (G_td.ERs[i].ER_id > 10000)
-				continue;
-			save_ER(&G_td.ERs[i], G_td.ERs[i].ER_id);
-		}
-	}
-#endif
 
 	/* Tree accumulation */
 	int no_union = 0;
@@ -472,18 +470,11 @@ static void get_ER_candidates(void)
 	ER_un_t *C_union = tree_accumulation(root, &no_union);
 	printff("[tr_accum] ER rest : %d\n", no_union);
 
-#if 1
-	
-	char fn[64];
-	sprintf(fn, "%s%03d.txt", G_td.output_path, G_td.img_id);
-	FILE *f = fopen(fn, "a");
-	ER_un_t *cur = C_union;
-	for (int i=0; i<no_union; i++, cur = cur->next) {
-		save_ER(cur->ER, cur->ER->ER_id, f);
-	}
-	fclose(f);
-#endif
-
+	/* output results */
+	if (G_td.output_mode == DRAW_ER_RECT_IN_IMAGE_AND_SAVE)
+		draw_ER_rectangle_in_original_image_and_save(C_union, no_union);
+	else if (G_td.output_mode == SAVE_ER_AS_TEXT_FILE)
+		save_ER_as_text_file(C_union, no_union);
 }
 
 void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo)
