@@ -320,12 +320,13 @@ ER_t *linear_reduction(ER_t *T)
 /* Draw ER rectangle in original image and save as jpg */
 void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 {
-	char fn[128];
 	IplImage *img;
+	char fn[128], img_fn[128];
 
 	// check if output image exist
 	int file_exist = 0;
-	sprintf(fn, "%s/%03d.jpg", G_td.output_path, G_td.img_id);
+	sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
+	sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
 	if (FILE * file = fopen(fn, "r")) {
         fclose(file);
         file_exist = 1;
@@ -338,7 +339,8 @@ void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, G_td.img_id);
 		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
 		// and save it first
-		sprintf(fn, "%s/%03d.jpg", G_td.output_path, G_td.img_id);
+		sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
+		sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
 		cvSaveImage(fn, img);
 	}
 
@@ -363,7 +365,8 @@ void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 	}
 	
 	// save image
-	sprintf(fn, "%s/%03d.jpg", G_td.output_path, G_td.img_id);
+	sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
+	sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
 	cvSaveImage(fn, img);
 	cvReleaseImage(&img);
 }
@@ -371,8 +374,9 @@ void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 /* Save ERs as text file */
 void save_ER_as_text_file(ER_un_t *cur, int no_union)
 {
-	char fn[64];
-	sprintf(fn, "%s/%03d.txt", G_td.output_path, G_td.img_id);
+	char fn[64], img_fn[64];
+	sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
+	sprintf(fn, "%s/%s.txt", G_td.output_path, img_fn);
 	FILE *f = fopen(fn, "a");
 	for (int i=0; i<no_union; i++, cur=cur->next) {
 		ER_t *T = cur->ER;

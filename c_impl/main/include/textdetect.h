@@ -59,6 +59,10 @@ typedef struct G_textdetect_t
 	char img_chan;           // current image channeld
 	char *input_path;        // input path
 	char *output_path;       // output path
+	char *output_fn_format;  // output filename format (Ex:"%03d") given %d is img_id
+
+	// used by evaluate_ER_candidates only
+	char *groundtruth_path;  // ground truth path
 
 	// used by generate_ER_candidates only
 	ER_t *ERs;               // ERs
