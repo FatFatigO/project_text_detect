@@ -45,7 +45,7 @@ void plot_ER(ER_t *T)
 }
 
 /* save utility function */
-void save_ER(ER_t *T, int idx, FILE *f)
+void draw_ER_rect_on_image(ER_t *T, int idx, FILE *f)
 {
 	/*
 	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
@@ -383,6 +383,77 @@ ER_t *linear_reduction(ER_t *T)
 	}
 }
 
+
+/* plot utility function */
+void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
+{
+	char fn[128];
+	IplImage *img;
+
+	// check if output image exist
+	int file_exist = 0;
+	sprintf(fn, "%s%03d.jpg", G_td.output_path, G_td.img_id);
+	if (FILE * file = fopen(fn, "r")) {
+        fclose(file);
+        file_exist = 1;
+    }
+	if (file_exist) {
+		// load from output path
+		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+	} else {
+		// load from original image path
+		char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest/";
+		sprintf(fn, "%simg_%d.jpg", in, G_td.img_id);
+		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		// and save it first
+		sprintf(fn, "%s%03d.jpg", G_td.output_path, G_td.img_id);
+		cvSaveImage(fn, img);
+	}
+
+	// draw rect
+	CvScalar color;
+	if (G_td.channel == 'y')
+		color = CV_RGB(255, 0, 0);
+	else if (G_td.channel == 'u')
+		color = CV_RGB(0, 255, 0);
+	else
+		color = CV_RGB(0, 0, 255);
+	for (int i=0; i<no_union; i++, cur=cur->next) {
+		ER_t *T = cur->ER;
+		cvRectangle(img, cvPoint(T->l*1.0/G_td.resize_ratio,T->t*1.0/G_td.resize_ratio), 
+						 cvPoint(T->r*1.0/G_td.resize_ratio,T->t*1.0/G_td.resize_ratio), color, 2);
+		cvRectangle(img, cvPoint(T->r*1.0/G_td.resize_ratio,T->t*1.0/G_td.resize_ratio), 
+						 cvPoint(T->r*1.0/G_td.resize_ratio,T->b*1.0/G_td.resize_ratio), color, 2);
+		cvRectangle(img, cvPoint(T->r*1.0/G_td.resize_ratio,T->b*1.0/G_td.resize_ratio), 
+						 cvPoint(T->l*1.0/G_td.resize_ratio,T->b*1.0/G_td.resize_ratio), color, 2);
+		cvRectangle(img, cvPoint(T->l*1.0/G_td.resize_ratio,T->b*1.0/G_td.resize_ratio), 
+						 cvPoint(T->l*1.0/G_td.resize_ratio,T->t*1.0/G_td.resize_ratio), color, 2);
+	}
+	
+	// save image
+	sprintf(fn, "%s%03d.jpg", G_td.output_path, G_td.img_id);
+	cvSaveImage(fn, img);
+	cvReleaseImage(&img);
+}
+
+/* save utility function */
+void save_ER_as_text_file(ER_un_t *cur, int no_union)
+{
+	char fn[64];
+	sprintf(fn, "%s%03d.txt", G_td.output_path, G_td.img_id);
+	FILE *f = fopen(fn, "a");
+	for (int i=0; i<no_union; i++, cur=cur->next) {
+		ER_t *T = cur->ER;
+		fprintf(f, "%d	%d	%d	%d	%c\n", 
+		(int)((T->l)*1.0/G_td.resize_ratio),
+		(int)((T->t)*1.0/G_td.resize_ratio), 
+		(int)((T->r-T->l+1)*1.0/G_td.resize_ratio), 
+		(int)((T->b-T->t+1)*1.0/G_td.resize_ratio), 
+		G_td.channel);
+	}
+	fclose(f);
+}
+
 void get_ER_candidates(void)
 {
 	/* Hook up boost classifier */
@@ -476,19 +547,17 @@ void get_ER_candidates(void)
 	ER_un_t *C_union = tree_accumulation(root, &no_union);
 	printff("[tr_accum] ER rest : %d\n", no_union);
 
-#if 1
-	
-	char fn[64];
-	sprintf(fn, "%s%03d.txt", G_td.output_path, G_td.img_id);
-	FILE *f = fopen(fn, "a");
-	ER_un_t *cur = C_union;
-	for (int i=0; i<no_union; i++, cur = cur->next) {
-		save_ER(cur->ER, cur->ER->ER_id, f);
-	}
-	fclose(f);
+#if 0
+	save_ER_as_text_file(C_union, no_union);
+#elif 1
+	draw_ER_rectangle_in_original_image_and_save(C_union, no_union);
+#else
+	;
 #endif
 
 }
+
+
 
 #if 0
 void main_sample_2(void)
@@ -659,19 +728,20 @@ int main(void)
 {
 
 #if 1
-	int algo = 3;
-	int img_id = 4;
+	int algo = 1;
 	int max_width = 1600;
-	float resize_ratio = 1.0;
+	int ICDAR_2013_start_img_no = 1;
+	int ICDAR_2013_end_img_no = 233;
 
 	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest/";
 	char out[100] = "../../../../../../../LargeFiles/ICDAR_2013/";
 	char fn[128];
 
-	for (int img_id = 205; img_id <= 233; img_id++) {
+	for (int img_id=ICDAR_2013_start_img_no; img_id<=ICDAR_2013_end_img_no; img_id++) {
 
 		sprintf(fn, "%simg_%d.jpg", in, img_id);
 		CvSize size;
+		float resize_ratio = 1.0;
 
 		IplImage *img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
 		if (img->width > max_width) {
