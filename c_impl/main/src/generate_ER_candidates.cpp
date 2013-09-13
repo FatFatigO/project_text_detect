@@ -335,10 +335,8 @@ void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 		// load from output path
 		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
 	} else {
-		// load from original image path
-		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, G_td.img_id);
-		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
-		// and save it first
+		// save original color image first
+		img = cvCloneImage(G_td.img_orig_rgb);
 		sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
 		sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
 		cvSaveImage(fn, img);
@@ -380,12 +378,15 @@ void save_ER_as_text_file(ER_un_t *cur, int no_union)
 	FILE *f = fopen(fn, "a");
 	for (int i=0; i<no_union; i++, cur=cur->next) {
 		ER_t *T = cur->ER;
-		fprintf(f, "%d	%d	%d	%d	%c\n", 
-		(int)((T->l)*1.0/G_td.img_resize_ratio),
-		(int)((T->t)*1.0/G_td.img_resize_ratio), 
-		(int)((T->r-T->l+1)*1.0/G_td.img_resize_ratio), 
-		(int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio), 
-		G_td.img_chan);
+		CvRect r = cvRect((int)((T->l)*1.0/G_td.img_resize_ratio),
+						  (int)((T->t)*1.0/G_td.img_resize_ratio),
+						  (int)((T->r-T->l+1)*1.0/G_td.img_resize_ratio),
+						  (int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio));
+		cvSetImageROI(G_td.img_orig_yuv, r);
+		CvScalar mean = cvAvg(G_td.img_orig_yuv);
+		fprintf(f, "%d	%d	%d	%d	%f	%f	%f	%c\n", 
+				r.x, r.y, r.width, r.height,
+				mean.val[0], mean.val[1], mean.val[2], G_td.img_chan);
 	}
 	fclose(f);
 }
@@ -423,9 +424,9 @@ void get_ER_candidates(void)
 				float h3 = floor(h*5.0/6);
 				int hc1 = 0, hc2 = 0, hc3 = 0;
 				LinkedPoint *cur = G_td.ERs[i].ER_head;
-				memset(G_td.hc1, 0, G_td.img->cols*sizeof(u8));
-				memset(G_td.hc2, 0, G_td.img->cols*sizeof(u8));
-				memset(G_td.hc3, 0, G_td.img->cols*sizeof(u8));
+				memset(G_td.hc1, 0, G_td.img->width*sizeof(u8));
+				memset(G_td.hc2, 0, G_td.img->width*sizeof(u8));
+				memset(G_td.hc3, 0, G_td.img->width*sizeof(u8));
 				for (int k=0; k<G_td.ERs[i].ER_size; k++, cur=cur->next) {
 					if (cur->pt.y == h1)
 						G_td.hc1[cur->pt.x] = 1;
@@ -481,7 +482,7 @@ void get_ER_candidates(void)
 		save_ER_as_text_file(C_union, no_union);
 }
 
-void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo)
+void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo)
 {
 	G_td.img = img;                                // input image
 	G_td.img_chan = img_chan;                      // image channel name
@@ -499,14 +500,14 @@ void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resiz
 		G_td.r.small_ar_pnty_coef = 0.08;
 		G_td.r.large_ar_pnty_coef = 0.03;
 	}
-
+	
 	// get ERs
-	ER_t *ERs = (ER_t *)malloc(img->rows*img->cols*sizeof(ERs[0]));
+	ER_t *ERs = (ER_t *)malloc(img->height*img->width*sizeof(ERs[0]));
 	assert(ERs != NULL);
 	G_td.ERs = ERs;
-	LinkedPoint *pts = (LinkedPoint*)malloc((img->rows*img->cols+1)*sizeof(pts[0]));
+	LinkedPoint *pts = (LinkedPoint*)malloc((img->height*img->width+1)*sizeof(pts[0]));
 	assert(pts != NULL);
-	int ER_no = get_ERs(img->data, img->rows, img->cols, *(img->step.buf), !G_td.r.text_is_darker/*2:see debug msg*/, ERs, pts);
+	int ER_no = get_ERs((u8 *)img->imageData, img->height, img->width, img->widthStep, !G_td.r.text_is_darker/*2:see debug msg*/, ERs, pts);
 
 	// assign some global variables
 	G_td.ER_no = ER_no;
@@ -522,12 +523,12 @@ void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resiz
 	G_td.ER_un = (ER_un_t *)malloc(ER_no*sizeof(ER_un_t));
 	assert(G_td.ER_un != NULL);
 	memset(G_td.ER_un, 0 , ER_no*sizeof(ER_un_t));
-	G_td.r.max_size = G_td.r.max_reg2img_ratio * img->cols * img->rows;//from ratio to real size
-	G_td.r.min_size = G_td.r.min_reg2img_ratio * img->cols * img->rows;//from ratio to real size
+	G_td.r.max_size = G_td.r.max_reg2img_ratio * img->width * img->height;//from ratio to real size
+	G_td.r.min_size = G_td.r.min_reg2img_ratio * img->width * img->height;//from ratio to real size
 	G_td.r.min_size = MAX(G_td.r.min_size, 64);
-	G_td.hc1 = (u8 *)malloc(img->cols*sizeof(u8));
-	G_td.hc2 = (u8 *)malloc(img->cols*sizeof(u8));
-	G_td.hc3 = (u8 *)malloc(img->cols*sizeof(u8));
+	G_td.hc1 = (u8 *)malloc(img->width*sizeof(u8));
+	G_td.hc2 = (u8 *)malloc(img->width*sizeof(u8));
+	G_td.hc3 = (u8 *)malloc(img->width*sizeof(u8));
 	assert(G_td.hc1 != NULL);
 	assert(G_td.hc2 != NULL);
 	assert(G_td.hc3 != NULL);
@@ -541,9 +542,11 @@ void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resiz
 			free(G_td.featraw[i].HC_buf);
 	}
 	free(G_td.featraw);
+	free(G_td.ER_no_array);
+	free(G_td.ER_un);
 }
 
-void generate_ER_candidates(Mat *img, int text_is_darker, int algo)
+void generate_ER_candidates(IplImage *img, int text_is_darker, int algo)
 {
 	int img_id = 0;
 	char img_chan = ' ';

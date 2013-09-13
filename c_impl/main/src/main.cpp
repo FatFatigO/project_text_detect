@@ -21,8 +21,8 @@ G_textdetect_t G_td;
 int ICDAR2013_generate_ER_candidates(void)
 {
 	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no =1;//233
-	int algo = 3;
+	int ICDAR_2013_end_img_no = 233;//233
+	int algo = 1;
 	int max_width = 1600;
 	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest";
 	//char out[100] = "../../../../../../../LargeFiles/ICDAR_2013"
@@ -42,26 +42,32 @@ int ICDAR2013_generate_ER_candidates(void)
 	G_td.input_path = in;
 	G_td.output_path = out;
 	G_td.output_fn_format = out_fn_format;
-	G_td.output_mode = 0;
+	G_td.output_mode = DRAW_ER_RECT_IN_IMAGE_AND_SAVE;//SAVE_ER_AS_TEXT_FILE; // or DRAW_ER_RECT_IN_IMAGE_AND_SAVE
 
 	// process each images
 	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
 
 		float img_resize_ratio = 1.0;
+		bool resize = 0;
 		CvSize size;
 
 		// load image
 		char fn[128];
 		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, img_id);
-		IplImage *img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		IplImage *img_rgb = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		IplImage *img_yuv = cvCloneImage(img_rgb);
+		cvCvtColor(img_rgb, img_yuv, CV_RGB2YUV);
+		G_td.img_orig_rgb = img_rgb;
+		G_td.img_orig_yuv = img_yuv;
 
 		// resize if needed
+		IplImage *img = img_yuv;
 		if (img->width > max_width) {
+			resize = true;
 			img_resize_ratio = max_width*1.0 / img->width;
 			size = cvSize(max_width, (int)img->height*img_resize_ratio);
 			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
 			cvResize(img, img_rs);
-			cvReleaseImage(&img);
 			img = img_rs;
 		} else {
 			size = cvGetSize(img);
@@ -72,26 +78,25 @@ int ICDAR2013_generate_ER_candidates(void)
 				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
 				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
 		cvSplit(img, y, u, v, NULL);
-		cvReleaseImage(&img);
-		Mat yy = Mat(y,0);
-		Mat uu = Mat(u,0);
-		Mat vv = Mat(v,0);
 
 		// generate ER candidates
-		generate_ER_candidates(&yy, img_id, 'y', img_resize_ratio, 0, algo);
-		generate_ER_candidates(&yy, img_id, 'y', img_resize_ratio, 1, algo);
-		generate_ER_candidates(&uu, img_id, 'u', img_resize_ratio, 0, algo);
-		generate_ER_candidates(&uu, img_id, 'u', img_resize_ratio, 1, algo);
-		generate_ER_candidates(&vv, img_id, 'v', img_resize_ratio, 0, algo);
-		generate_ER_candidates(&vv, img_id, 'v', img_resize_ratio, 1, algo);
+		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 0, algo);
+		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 1, algo);
+		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 0, algo);
+		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 1, algo);
+		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 0, algo);
+		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 1, algo);
 
 		// free resource
-		yy.release();
-		uu.release();
-		vv.release();
 		cvReleaseImage(&y);
 		cvReleaseImage(&u);
 		cvReleaseImage(&v);
+		if (G_td.img_orig_rgb != NULL) 
+			cvReleaseImage(&G_td.img_orig_rgb);
+		if (G_td.img_orig_yuv != NULL) 
+			cvReleaseImage(&G_td.img_orig_yuv);
+		if (resize) 
+			cvReleaseImage(&img); //img_rs
 	}
 _done:
 

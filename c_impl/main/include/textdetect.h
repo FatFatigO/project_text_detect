@@ -53,7 +53,9 @@ typedef struct rules_t
 typedef struct G_textdetect_t
 {
 	// shared info
-	Mat *img;                // current image
+	IplImage *img_orig_rgb;  // original rgb image
+	IplImage *img_orig_yuv;  // original yuv image
+	IplImage *img;           // current image
 	int img_id;              // current image id
 	float img_resize_ratio;  // resize ratio (dst/src)
 	char img_chan;           // current image channeld
@@ -87,7 +89,7 @@ typedef struct G_textdetect_t
 
 extern G_textdetect_t G_td;
 
-extern void generate_ER_candidates(Mat *img, int text_is_darker, int algo);
-extern void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo);
+extern void generate_ER_candidates(IplImage *img, int text_is_darker, int algo);
+extern void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo);
 
 #endif
