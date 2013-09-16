@@ -2,6 +2,8 @@
 #ifndef SYSTEM_H_
 #define SYSTEM_H_
 
+#define MAX_FN_LEN	256
+
 #define IN
 #define OUT
 

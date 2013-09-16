@@ -1,6 +1,7 @@
 #include "../include/system.h"
 #include "../include/imfeat.h"
 #include "../include/textdetect.h"
+#include "../include/util.h"
 #include <iostream>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -64,8 +65,8 @@ int ICDAR2013_generate_ER_candidates(void)
 		IplImage *img = img_yuv;
 		if (img->width > max_width) {
 			resize = true;
-			img_resize_ratio = max_width*1.0 / img->width;
-			size = cvSize(max_width, (int)img->height*img_resize_ratio);
+			img_resize_ratio = max_width*1.0f / img->width;
+			size = cvSize(max_width, (int)(img->height*img_resize_ratio));
 			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
 			cvResize(img, img_rs);
 			img = img_rs;
@@ -103,15 +104,16 @@ _done:
 	return 0;
 }
 
-#if 0
-int ICDAR2013_evaluate_ER_candidates(void)
+int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 {
 	int ICDAR_2013_start_img_no = 1;
 	int ICDAR_2013_end_img_no = 233;//233
 
-	char in_gdtr[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth";
-	char in[100] = "../../../../../TestResult/ICDAR_2013";
-	char out[100] = "../../../../../TestResult/ICDAR_2013";
+	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt";
+	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/09.12/Algo3_txt";
+	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
+
+	float recall = 0;
 
 	// check if in / out path exists
 	struct stat s;
@@ -135,62 +137,69 @@ int ICDAR2013_evaluate_ER_candidates(void)
 	// process each images
 	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
 
-		float img_resize_ratio = 1.0;
-		CvSize size;
+		// load ground truth
+		char fn_gt[MAX_FN_LEN];
+		sprintf(fn_gt, "%s/gt_img_%d.txt", G_td.groundtruth_path, img_id);
+		FILE *f_gt = fopen(fn_gt, "r");
+		char word[MAX_FN_LEN];
+		CvRect r_gt;
 
-		// load image
-		char fn[128];
-		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, img_id);
-		IplImage *img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		// load input file
+		char fn_in[MAX_FN_LEN];
+		sprintf(fn_in, "%s/img_%d.txt", G_td.input_path, img_id);
+		FILE *f_in = fopen(fn_in, "r");
 
-		// resize if needed
-		if (img->width > max_width) {
-			img_resize_ratio = max_width*1.0 / img->width;
-			size = cvSize(max_width, (int)img->height*img_resize_ratio);
-			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
-			cvResize(img, img_rs);
-			cvReleaseImage(&img);
-			img = img_rs;
-		} else {
-			size = cvGetSize(img);
+		// for each rectangle in ground truth
+		float recall_sum = 0;
+		int recall_no = 0;
+		while (!feof(f_gt)) {
+			fscanf(f_gt, "%d, %d, %d, %d, %s\n", &r_gt.x, &r_gt.y, &r_gt.width, &r_gt.height, word);
+
+			recall_no++;
+			rect_accumulate_start(r_gt);
+
+			// accumulate each rectangle from input data
+			fseek(f_in, 0, SEEK_SET);
+			while (!feof(f_in)) {
+				CvRect r_in;
+				float ym, um, vm;
+				char chan[5];
+				fscanf(f_in, "%d %d %d %d %f %f %f %s\n", &r_in.x, &r_in.y, &r_in.width, &r_in.height, &ym, &um, &vm, &chan);
+				
+				CvRect inter = rect_intersect(r_gt, r_in);
+				if (inter.width + inter.height == 0)
+					continue;
+				rect_accumulate_rect(inter);
+			}
+
+			recall_sum += rect_accumulate_get_percent();
+			rect_accumulate_end();
 		}
 
-		// get y,u,v channel images
-		IplImage *y = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
-		cvSplit(img, y, u, v, NULL);
-		cvReleaseImage(&img);
-		Mat yy = Mat(y,0);
-		Mat uu = Mat(u,0);
-		Mat vv = Mat(v,0);
+		fclose(f_in);
+		fclose(f_gt);
 
-		// generate ER candidates
-		generate_ER_candidates(&yy, img_id, 'y', img_resize_ratio, 0, algo);
-		generate_ER_candidates(&yy, img_id, 'y', img_resize_ratio, 1, algo);
-		generate_ER_candidates(&uu, img_id, 'u', img_resize_ratio, 0, algo);
-		generate_ER_candidates(&uu, img_id, 'u', img_resize_ratio, 1, algo);
-		generate_ER_candidates(&vv, img_id, 'v', img_resize_ratio, 0, algo);
-		generate_ER_candidates(&vv, img_id, 'v', img_resize_ratio, 1, algo);
-
-		// free resource
-		yy.release();
-		uu.release();
-		vv.release();
-		cvReleaseImage(&y);
-		cvReleaseImage(&u);
-		cvReleaseImage(&v);
+		//printf("img_%d recall:%1.3f\n", img_id, recall_sum/recall_no);
+		recall += (recall_sum/recall_no);
 	}
-_done:
 
+	// write output data
+	char fn_out[MAX_FN_LEN];
+	sprintf(fn_out, "%s/output.txt", G_td.output_path);
+	FILE *f_out = fopen(fn_out, "w");
+	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
+			ICDAR_2013_start_img_no,
+			ICDAR_2013_end_img_no,
+			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
+	fclose(f_out);
+
+_done:
 	return 0;
 }
-#endif
 
-void main(void) {
-
-	ICDAR2013_generate_ER_candidates();
-
-	//ICDAR2013_evaulate_ER_candidates();
+void main(void) 
+{
+	//ICDAR2013_generate_ER_candidates();
+	ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 
 }
