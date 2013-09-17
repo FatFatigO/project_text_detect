@@ -318,7 +318,7 @@ ER_t *linear_reduction(ER_t *T)
 }
 
 /* Draw ER rectangle in original image and save as jpg */
-void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
+static void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 {
 	IplImage *img;
 	char fn[128], img_fn[128];
@@ -370,7 +370,7 @@ void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 }
 
 /* Save ERs as text file */
-void save_ER_as_text_file(ER_un_t *cur, int no_union)
+static void save_ER_as_text_file(ER_un_t *cur, int no_union)
 {
 	char fn[64], img_fn[64];
 	sprintf(img_fn, G_td.output_fn_format, G_td.img_id);

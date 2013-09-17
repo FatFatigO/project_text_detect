@@ -62,5 +62,8 @@
     <ClCompile Include="..\..\main\src\util_rect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\main\src\generate_MSER_candidates.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

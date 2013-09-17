@@ -3,6 +3,7 @@
 #define TEXTDETECT_H_
 
 #include "system.h"
+#include "imfeat.h"
 #include <opencv2/core/core.hpp>
 using namespace cv;
 
@@ -91,5 +92,6 @@ extern G_textdetect_t G_td;
 
 extern void generate_ER_candidates(IplImage *img, int text_is_darker, int algo);
 extern void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo);
+extern void generate_MSER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
 
 #endif

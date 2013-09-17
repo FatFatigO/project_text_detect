@@ -20,6 +20,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\main\src\evaluate.cpp" />
     <ClCompile Include="..\..\main\src\generate_ER_candidates.cpp" />
+    <ClCompile Include="..\..\main\src\generate_MSER_candidates.cpp" />
     <ClCompile Include="..\..\main\src\imfeat\imfeat_binary_get_BoundingBox.cpp" />
     <ClCompile Include="..\..\main\src\imfeat\imfeat_binary_get_EulerNo.cpp" />
     <ClCompile Include="..\..\main\src\imfeat\imfeat_binary_get_HzCrossing.cpp" />

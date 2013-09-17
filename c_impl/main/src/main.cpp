@@ -110,10 +110,10 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 	int ICDAR_2013_end_img_no = 233;//233
 
 	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt";
-	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/09.12/Algo3_txt";
+	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/MSERs";
 	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
 
-	float recall = 0;
+	double recall = 0;
 
 	// check if in / out path exists
 	struct stat s;
@@ -150,7 +150,7 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 		FILE *f_in = fopen(fn_in, "r");
 
 		// for each rectangle in ground truth
-		float recall_sum = 0;
+		double recall_sum = 0;
 		int recall_no = 0;
 		while (!feof(f_gt)) {
 			fscanf(f_gt, "%d, %d, %d, %d, %s\n", &r_gt.x, &r_gt.y, &r_gt.width, &r_gt.height, word);
@@ -197,9 +197,95 @@ _done:
 	return 0;
 }
 
+int ICDAR2013_generate_MSER_candidates(void)
+{
+	int ICDAR_2013_start_img_no = 1;
+	int ICDAR_2013_end_img_no = 233;//233
+	int max_width = 1600;
+	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest";
+	//char out[100] = "../../../../../../../LargeFiles/ICDAR_2013"
+	char out[100] = "../../../../../TestResult/ICDAR_2013";
+	char out_fn_format[100] = "img_%d";
+
+	// check if in / out path exists
+	struct stat s;
+	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Input path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Output path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	G_td.input_path = in;
+	G_td.output_path = out;
+	G_td.output_fn_format = out_fn_format;
+	G_td.output_mode = DRAW_ER_RECT_IN_IMAGE_AND_SAVE;
+	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
+
+	// process each images
+	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+
+		float img_resize_ratio = 1.0;
+		bool resize = 0;
+		CvSize size;
+
+		// load image
+		char fn[128];
+		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, img_id);
+		IplImage *img_rgb = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		IplImage *img_yuv = cvCloneImage(img_rgb);
+		cvCvtColor(img_rgb, img_yuv, CV_RGB2YUV);
+		G_td.img_orig_rgb = img_rgb;
+		G_td.img_orig_yuv = img_yuv;
+
+		// resize if needed
+		IplImage *img = img_yuv;
+		if (img->width > max_width) {
+			resize = true;
+			img_resize_ratio = max_width*1.0f / img->width;
+			size = cvSize(max_width, (int)(img->height*img_resize_ratio));
+			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
+			cvResize(img, img_rs);
+			img = img_rs;
+		} else {
+			size = cvGetSize(img);
+		}
+
+		// get y,u,v channel images
+		IplImage *y = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
+				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
+				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
+		cvSplit(img, y, u, v, NULL);
+
+		// generate MSER candidates
+		generate_MSER_candidates(y, img_id, 'y', img_resize_ratio, 0);
+		generate_MSER_candidates(y, img_id, 'y', img_resize_ratio, 1);
+		generate_MSER_candidates(u, img_id, 'u', img_resize_ratio, 0);
+		generate_MSER_candidates(u, img_id, 'u', img_resize_ratio, 1);
+		generate_MSER_candidates(v, img_id, 'v', img_resize_ratio, 0);
+		generate_MSER_candidates(v, img_id, 'v', img_resize_ratio, 1);
+
+		// free resource
+		cvReleaseImage(&y);
+		cvReleaseImage(&u);
+		cvReleaseImage(&v);
+		if (G_td.img_orig_rgb != NULL) 
+			cvReleaseImage(&G_td.img_orig_rgb);
+		if (G_td.img_orig_yuv != NULL) 
+			cvReleaseImage(&G_td.img_orig_yuv);
+		if (resize) 
+			cvReleaseImage(&img); //img_rs
+	}
+_done:
+
+	return 0;
+}
+
+
 void main(void) 
 {
+	ICDAR2013_generate_MSER_candidates();
 	//ICDAR2013_generate_ER_candidates();
-	ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
-
+	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 }
