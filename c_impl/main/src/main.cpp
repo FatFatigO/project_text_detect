@@ -104,99 +104,6 @@ _done:
 	return 0;
 }
 
-int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
-{
-	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 233;//233
-
-	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt";
-	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/MSERs";
-	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
-
-	double recall = 0;
-
-	// check if in / out path exists
-	struct stat s;
-	if ((stat(in_gdtr, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Ground truth input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Output path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	G_td.groundtruth_path = in_gdtr;
-	G_td.input_path = in;
-	G_td.output_path = out;
-	G_td.output_fn_format = "img_%d";
-
-	// process each images
-	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
-
-		// load ground truth
-		char fn_gt[MAX_FN_LEN];
-		sprintf(fn_gt, "%s/gt_img_%d.txt", G_td.groundtruth_path, img_id);
-		FILE *f_gt = fopen(fn_gt, "r");
-		char word[MAX_FN_LEN];
-		CvRect r_gt;
-
-		// load input file
-		char fn_in[MAX_FN_LEN];
-		sprintf(fn_in, "%s/img_%d.txt", G_td.input_path, img_id);
-		FILE *f_in = fopen(fn_in, "r");
-
-		// for each rectangle in ground truth
-		double recall_sum = 0;
-		int recall_no = 0;
-		while (!feof(f_gt)) {
-			fscanf(f_gt, "%d, %d, %d, %d, %s\n", &r_gt.x, &r_gt.y, &r_gt.width, &r_gt.height, word);
-
-			recall_no++;
-			rect_accumulate_start(r_gt);
-
-			// accumulate each rectangle from input data
-			fseek(f_in, 0, SEEK_SET);
-			while (!feof(f_in)) {
-				CvRect r_in;
-				float ym, um, vm;
-				char chan[5];
-				fscanf(f_in, "%d %d %d %d %f %f %f %s\n", &r_in.x, &r_in.y, &r_in.width, &r_in.height, &ym, &um, &vm, &chan);
-				
-				CvRect inter = rect_intersect(r_gt, r_in);
-				if (inter.width + inter.height == 0)
-					continue;
-				rect_accumulate_rect(inter);
-			}
-
-			recall_sum += rect_accumulate_get_percent();
-			rect_accumulate_end();
-		}
-
-		fclose(f_in);
-		fclose(f_gt);
-
-		//printf("img_%d recall:%1.3f\n", img_id, recall_sum/recall_no);
-		recall += (recall_sum/recall_no);
-	}
-
-	// write output data
-	char fn_out[MAX_FN_LEN];
-	sprintf(fn_out, "%s/output.txt", G_td.output_path);
-	FILE *f_out = fopen(fn_out, "w");
-	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
-			ICDAR_2013_start_img_no,
-			ICDAR_2013_end_img_no,
-			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
-	fclose(f_out);
-
-_done:
-	return 0;
-}
-
 int ICDAR2013_generate_MSER_candidates(void)
 {
 	int ICDAR_2013_start_img_no = 1;
@@ -282,10 +189,185 @@ _done:
 	return 0;
 }
 
+int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
+{
+	int ICDAR_2013_start_img_no = 1;
+	int ICDAR_2013_end_img_no = 233;//233
+
+	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt";
+	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/ER_a3/txt";
+	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
+
+	double recall = 0;
+
+	// check if in / out path exists
+	struct stat s;
+	if ((stat(in_gdtr, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Ground truth input path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Input path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Output path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	G_td.groundtruth_path = in_gdtr;
+	G_td.input_path = in;
+	G_td.output_path = out;
+	G_td.output_fn_format = "img_%d";
+
+	// process each images
+	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+
+		// load ground truth
+		char fn_gt[MAX_FN_LEN];
+		sprintf(fn_gt, "%s/gt_img_%d.txt", G_td.groundtruth_path, img_id);
+		FILE *f_gt = fopen(fn_gt, "r");
+		char word[MAX_FN_LEN];
+		CvRect r_gt;
+
+		// load input file
+		char fn_in[MAX_FN_LEN];
+		sprintf(fn_in, "%s/img_%d.txt", G_td.input_path, img_id);
+		FILE *f_in = fopen(fn_in, "r");
+
+		// for each rectangle in ground truth
+		double recall_sum = 0;
+		int recall_no = 0;
+		while (!feof(f_gt)) {
+			fscanf(f_gt, "%d, %d, %d, %d, %s\n", &r_gt.x, &r_gt.y, &r_gt.width, &r_gt.height, word);
+
+			recall_no++;
+			rect_accumulate_start(r_gt);
+
+			// accumulate each rectangle from input data
+			fseek(f_in, 0, SEEK_SET);
+			while (!feof(f_in)) {
+				CvRect r_in;
+				float ym, um, vm;
+				char chan[5];
+				fscanf(f_in, "%d %d %d %d %f %f %f %s\n", &r_in.x, &r_in.y, &r_in.width, &r_in.height, &ym, &um, &vm, &chan);
+				
+				CvRect inter = rect_intersect(r_gt, r_in);
+				if (inter.width + inter.height == 0)
+					continue;
+				rect_accumulate_rect(inter);
+			}
+
+			recall_sum += rect_accumulate_get_percent();
+			rect_accumulate_end();
+		}
+
+		fclose(f_in);
+		fclose(f_gt);
+
+		//printf("img_%d recall:%1.3f\n", img_id, recall_sum/recall_no);
+		recall += (recall_sum/recall_no);
+	}
+
+	// write output data
+	char fn_out[MAX_FN_LEN];
+	sprintf(fn_out, "%s/ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth.txt", G_td.output_path);
+	FILE *f_out = fopen(fn_out, "w");
+	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
+			ICDAR_2013_start_img_no,
+			ICDAR_2013_end_img_no,
+			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
+	fclose(f_out);
+
+_done:
+	return 0;
+}
+
+
+int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
+{
+	int ICDAR_2013_start_img_no = 1;
+	int ICDAR_2013_end_img_no = 233;//233
+
+	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png";
+	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/ER_a3/txt";
+	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
+
+	double recall = 0;
+
+	// check if in / out path exists
+	struct stat s;
+	if ((stat(in_gdtr, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Ground truth input path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Input path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
+		printf("ERR: Output path doesn't exist. Please create it first.");
+		goto _done;
+	}
+	G_td.groundtruth_path = in_gdtr;
+	G_td.input_path = in;
+	G_td.output_path = out;
+	G_td.output_fn_format = "img_%d";
+
+	// process each images
+	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+
+		// load ground truth
+		char fn_gt[MAX_FN_LEN];
+		sprintf(fn_gt, "%s/gt_img_%d.png", G_td.groundtruth_path, img_id);
+		Mat img_bin, img_gray = imread(fn_gt, CV_LOAD_IMAGE_GRAYSCALE);
+
+		// binarize: threshold:254, maxvalue:1, mode:inverted(=>text=1,bg=0)
+		threshold(img_gray, img_bin, 254, 1, 1);
+		CvRect r_gt = cvRect(0, 0, img_bin.cols, img_bin.rows);
+
+		// load input file
+		char fn_in[MAX_FN_LEN];
+		sprintf(fn_in, "%s/img_%d.txt", G_td.input_path, img_id);
+		FILE *f_in = fopen(fn_in, "r");
+
+		// accumulate each rectangle from input data
+		rect_accumulate_start(r_gt, img_bin);
+		fseek(f_in, 0, SEEK_SET);
+		while (!feof(f_in)) {
+			CvRect r_in;
+			float ym, um, vm;
+			char chan[5];
+			fscanf(f_in, "%d %d %d %d %f %f %f %s\n", &r_in.x, &r_in.y, &r_in.width, &r_in.height, &ym, &um, &vm, &chan);
+				
+			CvRect inter = rect_intersect(r_gt, r_in);
+			if (inter.width + inter.height == 0)
+				continue;
+			rect_accumulate_rect(inter);
+		}
+		fclose(f_in);
+
+		recall += rect_accumulate_get_percent();
+		rect_accumulate_end();
+	}
+
+	// write output data
+	char fn_out[MAX_FN_LEN];
+	sprintf(fn_out, "%s/ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth.txt", G_td.output_path);
+	FILE *f_out = fopen(fn_out, "w");
+	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
+			ICDAR_2013_start_img_no,
+			ICDAR_2013_end_img_no,
+			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
+	fclose(f_out);
+
+_done:
+	return 0;
+}
 
 void main(void) 
 {
-	ICDAR2013_generate_MSER_candidates();
+	//ICDAR2013_generate_MSER_candidates();
 	//ICDAR2013_generate_ER_candidates();
-	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
+	ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
+	ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();
 }

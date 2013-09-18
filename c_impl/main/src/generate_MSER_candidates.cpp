@@ -108,9 +108,14 @@ static void save_ER_as_text_file(vector<vector<Point>> contours)
 						     (int)((b-t+1)*1.0/G_td.img_resize_ratio));
 		//cvSetImageROI(G_td.img_orig_yuv, rect);
 		//CvScalar mean = cvAvg(G_td.img_orig_yuv);
-		fprintf(f, "%d	%d	%d	%d	%f	%f	%f	%c\n", 
+		int base;
+		if (G_td.img_chan == 'y') base = 0;
+		if (G_td.img_chan == 'u') base = 2;
+		if (G_td.img_chan == 'v') base = 4;
+		int chan = base + G_td.r.text_is_darker;
+		fprintf(f, "%d	%d	%d	%d	%f	%f	%f	%d\n", 
 				rect.x, rect.y, rect.width, rect.height,
-				sum.val[0]*1.0/reg.size(), sum.val[1]*1.0/reg.size(), sum.val[2]*1.0/reg.size(), G_td.img_chan);
+				sum.val[0]*1.0/reg.size(), sum.val[1]*1.0/reg.size(), sum.val[2]*1.0/reg.size(), chan);
 	}
 
 	fclose(f);
@@ -125,6 +130,18 @@ void generate_MSER_candidates(IplImage *in_img, int img_id, char img_chan, float
 	G_td.img_id = img_id;                          // image id
 	G_td.img_resize_ratio = img_resize_ratio;      // resize ratio
 	G_td.r.text_is_darker = text_is_darker;        // text is darker than background or not
+
+	// inverse if needed
+	if (text_is_darker) {
+		char *data = G_td.img->imageData;
+		for (int h = 0; h<G_td.img->height; h++) {
+			char *p = &data[h*G_td.img->widthStep];
+			for (int w = 0; w<G_td.img->width; w++) {
+				*p = 255 - *p;
+				p = p + 1;
+			}
+		}
+	}
 
 	// extract MSER into contours
 	vector<vector<Point>> contours;
