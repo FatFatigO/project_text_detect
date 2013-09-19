@@ -45,7 +45,7 @@ bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
 	if (C_no == 0)
 		return true;
 	ER_un_t *cur = C;
-	T->ar = (T->r - T->l + 1) * 1.0 / (T->b - T->t + 1);
+	T->ar = (float)((T->r - T->l + 1) * 1.0 / (T->b - T->t + 1));
 
 	// find min_svar_wp_C (with penalty)
 	double svar_wp_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
@@ -55,7 +55,7 @@ bool tree_accumulation_algo1(ER_t *T, int C_no, ER_un_t *C)
 		svar_wp_T = svar_wp_T - (G_td.r.small_ar_pnty_coef) * (G_td.r.max_ar - T->ar);
 	double min_svar_wp_C = 10000000; cur = C;
 	for (int i=0; i<C_no; i++, cur = cur->next) {
-		cur->ER->ar = (cur->ER->r - cur->ER->l + 1) * 1.0 / (cur->ER->b - cur->ER->t + 1);
+		cur->ER->ar =  (float)((cur->ER->r - cur->ER->l + 1) * 1.0 / (cur->ER->b - cur->ER->t + 1));
 		double svar_wp_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
 		if (cur->ER->ar > G_td.r.max_ar)
 			svar_wp_c = svar_wp_c - (G_td.r.large_ar_pnty_coef) * (cur->ER->ar - G_td.r.max_ar);
@@ -117,7 +117,7 @@ bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
 	if (C_no == 0)
 		return true;
 	ER_un_t *cur = C;
-	T->ar = (T->r - T->l + 1) * 1.0 / (T->b - T->t + 1);
+	T->ar = (float)((T->r - T->l + 1) * 1.0 / (T->b - T->t + 1));
 
 	// find min_svar_wp_C (with penalty)
 	double svar_wp_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
@@ -127,7 +127,7 @@ bool tree_accumulation_algo3(ER_t *T, int C_no, ER_un_t *C)
 		svar_wp_T = svar_wp_T - (G_td.r.small_ar_pnty_coef) * (G_td.r.max_ar - T->ar);
 	double min_svar_wp_C = 10000000; cur = C;
 	for (int i=0; i<C_no; i++, cur = cur->next) {
-		cur->ER->ar = (cur->ER->r - cur->ER->l + 1) * 1.0 / (cur->ER->b - cur->ER->t + 1);
+		cur->ER->ar = (float)((cur->ER->r - cur->ER->l + 1) * 1.0 / (cur->ER->b - cur->ER->t + 1));
 		double svar_wp_c = (cur->ER->to_parent->ER_size - cur->ER->ER_size)*1.0 / cur->ER->ER_size;
 		if (cur->ER->ar > G_td.r.max_ar)
 			svar_wp_c = svar_wp_c - (G_td.r.large_ar_pnty_coef) * (cur->ER->ar - G_td.r.max_ar);
@@ -352,14 +352,14 @@ static void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_un
 		color = CV_RGB(0, 0, 255);
 	for (int i=0; i<no_union; i++, cur=cur->next) {
 		ER_t *T = cur->ER;
-		cvRectangle(img, cvPoint(T->l*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), 
-						 cvPoint(T->r*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), color, 2);
-		cvRectangle(img, cvPoint(T->r*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), 
-						 cvPoint(T->r*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), color, 2);
-		cvRectangle(img, cvPoint(T->r*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), 
-						 cvPoint(T->l*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), color, 2);
-		cvRectangle(img, cvPoint(T->l*1.0/G_td.img_resize_ratio,T->b*1.0/G_td.img_resize_ratio), 
-						 cvPoint(T->l*1.0/G_td.img_resize_ratio,T->t*1.0/G_td.img_resize_ratio), color, 2);
+		cvRectangle(img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
 	}
 	
 	// save image
@@ -384,9 +384,14 @@ static void save_ER_as_text_file(ER_un_t *cur, int no_union)
 						  (int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio));
 		cvSetImageROI(G_td.img_orig_yuv, r);
 		CvScalar mean = cvAvg(G_td.img_orig_yuv);
-		fprintf(f, "%d	%d	%d	%d	%f	%f	%f	%c\n", 
+		int base;
+		if (G_td.img_chan == 'y') base = 0;
+		if (G_td.img_chan == 'u') base = 2;
+		if (G_td.img_chan == 'v') base = 4;
+		int chan = base + G_td.r.text_is_darker;
+		fprintf(f, "%d	%d	%d	%d	%f	%f	%f	%d\n", 
 				r.x, r.y, r.width, r.height,
-				mean.val[0], mean.val[1], mean.val[2], G_td.img_chan);
+				mean.val[0], mean.val[1], mean.val[2], chan);
 	}
 	fclose(f);
 }
@@ -413,15 +418,15 @@ void get_ER_candidates(void)
 			if (G_td.ER_no_array[i]) {
 				m++;
 				/* prepare features (1~3) : aspect ratio, compactness, no of holes */
-				float ar = (G_td.ERs[i].r - G_td.ERs[i].l + 1) * 1.0 / (G_td.ERs[i].b - G_td.ERs[i].t + 1);  
-				float cp = sqrt((double)G_td.ERs[i].ER_size) * 1.0 / G_td.ERs[i].p;
-				float nh = 1 - G_td.ERs[i].eu;
+				float ar = (float)((G_td.ERs[i].r - G_td.ERs[i].l + 1) * 1.0 / (G_td.ERs[i].b - G_td.ERs[i].t + 1));  
+				float cp = (float)(sqrt((double)G_td.ERs[i].ER_size) * 1.0 / G_td.ERs[i].p);
+				float nh = (float)(1 - G_td.ERs[i].eu);
 				/* prepare feature (4) : median of horizontal crossing */
 				int h = G_td.ERs[i].b - G_td.ERs[i].t + 1;
 				int w = G_td.ERs[i].r - G_td.ERs[i].l + 1;
-				float h1 = floor(h*1.0/6);
-				float h2 = floor(h*3.0/6);
-				float h3 = floor(h*5.0/6);
+				float h1 = (float)(floor(h*1.0/6));
+				float h2 = (float)(floor(h*3.0/6));
+				float h3 = (float)(floor(h*5.0/6));
 				int hc1 = 0, hc2 = 0, hc3 = 0;
 				LinkedPoint *cur = G_td.ERs[i].ER_head;
 				memset(G_td.hc1, 0, G_td.img->width*sizeof(u8));
@@ -457,10 +462,10 @@ void get_ER_candidates(void)
 				featVector->data.fl[0] = ar;
 				featVector->data.fl[1] = cp;
 				featVector->data.fl[2] = nh;
-				featVector->data.fl[3] = hc[1]; // median
+				featVector->data.fl[3] = (float)hc[1]; // median
 				float score = boost.predict(featVector, 0, 0, CV_WHOLE_SEQ, false, true);
 				G_td.ERs[i].label = (score>=0) ? 1 : -1;
-				G_td.ERs[i].postp = 1.0/(1+exp(-2.0*abs(score)));
+				G_td.ERs[i].postp = (float)(1.0/(1+exp(-2.0*abs(score))));
 				G_td.ERs[i].ar = ar;
 			}
 		}
@@ -476,7 +481,7 @@ void get_ER_candidates(void)
 	printff("[tr_accum] ER rest : %d\n", no_union);
 
 	/* output results */
-	if (G_td.output_mode == DRAW_ER_RECT_IN_IMAGE_AND_SAVE)
+	if ((G_td.output_mode == DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE) || (G_td.output_mode == DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE))
 		draw_ER_rectangle_in_original_image_and_save(C_union, no_union);
 	else if (G_td.output_mode == SAVE_ER_AS_TEXT_FILE)
 		save_ER_as_text_file(C_union, no_union);
@@ -523,8 +528,8 @@ void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_
 	G_td.ER_un = (ER_un_t *)malloc(ER_no*sizeof(ER_un_t));
 	assert(G_td.ER_un != NULL);
 	memset(G_td.ER_un, 0 , ER_no*sizeof(ER_un_t));
-	G_td.r.max_size = G_td.r.max_reg2img_ratio * img->width * img->height;//from ratio to real size
-	G_td.r.min_size = G_td.r.min_reg2img_ratio * img->width * img->height;//from ratio to real size
+	G_td.r.max_size = (int)(G_td.r.max_reg2img_ratio * img->width * img->height);//from ratio to real size
+	G_td.r.min_size = (int)(G_td.r.min_reg2img_ratio * img->width * img->height);//from ratio to real size
 	G_td.r.min_size = MAX(G_td.r.min_size, 64);
 	G_td.hc1 = (u8 *)malloc(img->width*sizeof(u8));
 	G_td.hc2 = (u8 *)malloc(img->width*sizeof(u8));

@@ -83,8 +83,9 @@ typedef struct G_textdetect_t
 	bool (*lr_algo)(ER_t *, ER_t *);            // linear-reduction algo
 	bool (*ta_algo)(ER_t *, int, ER_un_t *);    // tree-accumulation algo
 	int output_mode;
-#define DRAW_ER_RECT_IN_IMAGE_AND_SAVE	0
-#define SAVE_ER_AS_TEXT_FILE            1
+#define DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE	0
+#define DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE	1
+#define SAVE_ER_AS_TEXT_FILE                    2
 
 } G_textdetect_t;
 

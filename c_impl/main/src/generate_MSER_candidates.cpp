@@ -43,6 +43,14 @@ static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> c
 		cvSaveImage(fn, img);
 	}
 
+	/*
+	sprintf(fn, "%s/gt_%s.png", G_td.groundtruth_path, img_fn);
+	img_gray = imread(fn, CV_LOAD_IMAGE_GRAYSCALE);
+	// binarize: threshold:254, maxvalue:128, mode:inverted(=>text=128,bg=0)
+	threshold(img_gray, img_bin, 254, 128, 1);
+	cvtColor(img, cimg, CV_GRAY2RGB);
+	*/
+
 	// draw rect
 	CvScalar color;
 	if (G_td.img_chan == 'y')
@@ -61,14 +69,14 @@ static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> c
 			t = min(t, pt.y);
 			b = max(b, pt.y);
 		}
-		cvRectangle(img, cvPoint(l*1.0/G_td.img_resize_ratio,t*1.0/G_td.img_resize_ratio), 
-						 cvPoint(r*1.0/G_td.img_resize_ratio,t*1.0/G_td.img_resize_ratio), color, 2);
-		cvRectangle(img, cvPoint(r*1.0/G_td.img_resize_ratio,t*1.0/G_td.img_resize_ratio), 
-						 cvPoint(r*1.0/G_td.img_resize_ratio,b*1.0/G_td.img_resize_ratio), color, 2);
-		cvRectangle(img, cvPoint(r*1.0/G_td.img_resize_ratio,b*1.0/G_td.img_resize_ratio), 
-						 cvPoint(l*1.0/G_td.img_resize_ratio,b*1.0/G_td.img_resize_ratio), color, 2);
-		cvRectangle(img, cvPoint(l*1.0/G_td.img_resize_ratio,b*1.0/G_td.img_resize_ratio), 
-						 cvPoint(l*1.0/G_td.img_resize_ratio,t*1.0/G_td.img_resize_ratio), color, 2);
+		cvRectangle(img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
+						 cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
 	}
 	
 	// save image
@@ -155,7 +163,7 @@ void generate_MSER_candidates(IplImage *in_img, int img_id, char img_chan, float
 	Mat img = Mat(in_img,0);
 
 	/* output results */
-	if (G_td.output_mode == DRAW_ER_RECT_IN_IMAGE_AND_SAVE)
+	if ((G_td.output_mode == DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE) || (G_td.output_mode == DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE))
 		draw_ER_rectangle_in_original_image_and_save(contours);
 	else if (G_td.output_mode == SAVE_ER_AS_TEXT_FILE)
 		save_ER_as_text_file(contours);
