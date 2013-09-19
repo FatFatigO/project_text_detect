@@ -22,30 +22,10 @@ char in_gdtr[MAX_FN_LEN], in[MAX_FN_LEN], out[MAX_FN_LEN];
 
 int ICDAR2013_generate_ER_candidates(void)
 {
-	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 1;//233
+	int ICDAR_2013_start_img_no = 82;
+	int ICDAR_2013_end_img_no = 82;//233
 	int algo = 2;
 	int max_width = 1600;
-	char in[100] =  "../../../../../Dataset/ICDAR_2013/SceneTest";
-	//char out[100] = "../../../../../../../LargeFiles/ICDAR_2013"
-	char out[100] = "../../../../../TestResult/ICDAR_2013/ER_a3/txt";
-	char out_fn_format[100] = "img_%d";
-
-	// check if in / out path exists
-	struct stat s;
-	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Output path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	G_td.input_path = in;
-	G_td.output_path = out;
-	G_td.output_fn_format = out_fn_format;
-	//G_td.output_mode = DRAW_ER_RECT_IN_IMAGE_AND_SAVE;
-	G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
 
 	// process each images
 	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
@@ -101,7 +81,6 @@ int ICDAR2013_generate_ER_candidates(void)
 		if (resize) 
 			cvReleaseImage(&img); //img_rs
 	}
-_done:
 
 	return 0;
 }
@@ -166,7 +145,6 @@ int ICDAR2013_generate_MSER_candidates(void)
 		if (resize) 
 			cvReleaseImage(&img); //img_rs
 	}
-_done:
 
 	return 0;
 }
@@ -176,32 +154,8 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 	int ICDAR_2013_start_img_no = 1;
 	int ICDAR_2013_end_img_no = 233;//233
 
-	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt";
-	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/ER_a3/txt";
-	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
-
-	double recall = 0;
-
-	// check if in / out path exists
-	struct stat s;
-	if ((stat(in_gdtr, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Ground truth input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Output path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	G_td.groundtruth_path = in_gdtr;
-	G_td.input_path = in;
-	G_td.output_path = out;
-	G_td.output_fn_format = "img_%d";
-
 	// process each images
+	double recall = 0;
 	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
 
 		// load ground truth
@@ -260,7 +214,6 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
 	fclose(f_out);
 
-_done:
 	return 0;
 }
 
@@ -269,32 +222,8 @@ int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
 	int ICDAR_2013_start_img_no = 1;
 	int ICDAR_2013_end_img_no = 233;//233
 
-	char in_gdtr[MAX_FN_LEN] =  "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png";
-	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/ER_a3/txt";
-	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
-
-	double recall = 0;
-
-	// check if in / out path exists
-	struct stat s;
-	if ((stat(in_gdtr, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Ground truth input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Output path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	G_td.groundtruth_path = in_gdtr;
-	G_td.input_path = in;
-	G_td.output_path = out;
-	G_td.output_fn_format = "img_%d";
-
 	// process each images
+	double recall = 0;
 	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
 
 		// load ground truth
@@ -341,7 +270,6 @@ int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
 			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
 	fclose(f_out);
 
-_done:
 	return 0;
 }
 
@@ -349,24 +277,6 @@ int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 {
 	int ICDAR_2013_start_img_no = 1;
 	int ICDAR_2013_end_img_no = 233;//233
-
-	char in[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013/ER_a3/txt";
-	char out[MAX_FN_LEN] = "../../../../../TestResult/ICDAR_2013";
-
-	// check if in / out path exists
-	struct stat s;
-	if ((stat(in, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Input path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	if ((stat(out, &s)==-1) || !S_ISDIR(s.st_mode)) {
-		printf("ERR: Output path doesn't exist. Please create it first.");
-		goto _done;
-	}
-	//G_td.groundtruth_path = in_gdtr;
-	G_td.input_path = in;
-	G_td.output_path = out;
-	G_td.output_fn_format = "img_%d";
 
 	// write output data
 	char fn_out[MAX_FN_LEN];
@@ -405,22 +315,26 @@ int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 	fprintf(f_out, "Total: %4d regions", total);
 	fclose(f_out);
 
-_done:
 	return 0;
 }
 
-
 int init_path()
 {
+	/* Ground truth */
 	sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png");
 	//sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt");
-	//sprintf(in, "../../../../../TestResult/ICDAR_2013/ER_a3/txt");
-	sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
-	sprintf(out, "../../../../../TestResult/ICDAR_2013");
 
+	/* Input */
+	sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
+	//sprintf(in, "../../../../../TestResult/ICDAR_2013/ER_a3/txt");
+
+	/* Output */
+	sprintf(out, "../../../../../TestResult/ICDAR_2013");
 	G_td.output_fn_format = "img_%d";
-	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
+
+	/* Output mode */
 	G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
+	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
 	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
 
 	// check if in / out path exists
@@ -444,12 +358,11 @@ int init_path()
 	return 0;
 }
 
-
 void main(void) 
 {
-	if (init_path() == -1) return;
+	if (init_path() == -1) {int c; scanf("%c",&c); return;}
 
-	ICDAR2013_generate_MSER_candidates();
+	//ICDAR2013_generate_MSER_candidates();
 	//ICDAR2013_generate_ER_candidates();
 	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();

@@ -228,7 +228,7 @@ procedure LINEAR-REDUCTION(T)
 end procedure
 */
 
-bool linear_reduction_algo(ER_t *T, ER_t *c)
+bool linear_reduction_algo1(ER_t *T, ER_t *c)
 {
 	// Before:        --> "T" --> "c" --> "c's child"
 	// After(True):   --> "T" ----------> "c's child"
@@ -240,6 +240,28 @@ bool linear_reduction_algo(ER_t *T, ER_t *c)
 		return true;
 	} else {
 		// T's variance > c's variance
+		return false;
+	}
+}
+
+bool linear_reduction_algo2(ER_t *T, ER_t *c)
+{
+	// Before:        --> "T" --> "c" --> "c's child"
+	// After(True):   --> "T" ----------> "c's child"
+	// After(False):  ----------> "c" --> "c's child"
+	double svar_T = (T->to_parent) ? ((T->to_parent->ER_size - T->ER_size) * 1.0 / T->ER_size) : 0;
+	double svar_c = (T->ER_size - c->ER_size) * 1.0 / c->ER_size;
+	double post_T = T->postp;
+	double post_c = c->postp;
+	if (post_T >= post_c) {
+		// T's postp >= c's postp
+		if (svar_c < svar_T) 
+			return false;
+		else
+			return true;
+		return true;
+	} else {
+		// T's postp < c's postp
 		return false;
 	}
 }
@@ -396,80 +418,105 @@ static void save_ER_as_text_file(ER_un_t *cur, int no_union)
 	fclose(f);
 }
 
-void get_ER_candidates(void)
+void calc_ER_postp(void)
 {
 	/* Hook up boost classifier */
 	CvBoost boost;
 	boost.load("./boost_4fv.xml", "boost");
 	G_td.boost = (CvBoost *)&boost;
 
+	/* Calc postp at a time */
+	int m = 0;
+	CvMat* featVector = cvCreateMat(1, 4, CV_32FC1);
+	for (int i=0; i<G_td.ER_no; i++) {
+		if (G_td.ER_no_array[i]) {
+			m++;
+			/* prepare features (1~3) : aspect ratio, compactness, no of holes */
+			float ar = (float)((G_td.ERs[i].r - G_td.ERs[i].l + 1) * 1.0 / (G_td.ERs[i].b - G_td.ERs[i].t + 1));  
+			float cp = (float)(sqrt((double)G_td.ERs[i].ER_size) * 1.0 / G_td.ERs[i].p);
+			float nh = (float)(1 - G_td.ERs[i].eu);
+			/* prepare feature (4) : median of horizontal crossing */
+			int h = G_td.ERs[i].b - G_td.ERs[i].t + 1;
+			int w = G_td.ERs[i].r - G_td.ERs[i].l + 1;
+			float h1 = (float)(floor(h*1.0/6));
+			float h2 = (float)(floor(h*3.0/6));
+			float h3 = (float)(floor(h*5.0/6));
+			int hc1 = 0, hc2 = 0, hc3 = 0;
+			LinkedPoint *cur = G_td.ERs[i].ER_head;
+			memset(G_td.hc1, 0, G_td.img->width*sizeof(u8));
+			memset(G_td.hc2, 0, G_td.img->width*sizeof(u8));
+			memset(G_td.hc3, 0, G_td.img->width*sizeof(u8));
+			for (int k=0; k<G_td.ERs[i].ER_size; k++, cur=cur->next) {
+				if (cur->pt.y == h1)
+					G_td.hc1[cur->pt.x] = 1;
+				if (cur->pt.y == h2)
+					G_td.hc2[cur->pt.x] = 1;
+				if (cur->pt.y == h3)
+					G_td.hc3[cur->pt.x] = 1;
+			}
+			for (int k=0; k<w-1; k++) {
+				if (G_td.hc1[k] + G_td.hc1[k+1] == 1) hc1++;
+				if (G_td.hc2[k] + G_td.hc2[k+1] == 1) hc2++;
+				if (G_td.hc3[k] + G_td.hc3[k+1] == 1) hc3++;
+			}
+			int hc[3];
+			hc[0] = hc1 + (G_td.hc1[0] + G_td.hc1[w-1]);
+			hc[1] = hc2 + (G_td.hc2[0] + G_td.hc2[w-1]);
+			hc[2] = hc3 + (G_td.hc3[0] + G_td.hc3[w-1]);
+			for (int k=2; k>0; k--) {
+				for (int j=2; j>0; j--) {
+					if (hc[j]<hc[j-1]) {
+						int tmp = hc[j-1];
+						hc[j-1] = hc[j];
+						hc[j] = tmp;
+					}
+				}
+			}
+			// calc posterior probability
+			featVector->data.fl[0] = ar;
+			featVector->data.fl[1] = cp;
+			featVector->data.fl[2] = nh;
+			featVector->data.fl[3] = (float)hc[1]; // median
+			float score = boost.predict(featVector, 0, 0, CV_WHOLE_SEQ, false, true);
+			G_td.ERs[i].label = (score>=0) ? 1 : -1;
+			G_td.ERs[i].postp = (float)(1.0/(1+exp(-2.0*abs(score))));
+			G_td.ERs[i].ar = ar;
+		}
+	}
+}
+
+void get_ER_candidates(void)
+{
+#if 0 // fianl correct flow
+	/* Calculate post prob */
+	if (G_td.r.tree_accum_algo == 2) {
+		calc_ER_postp();
+	}
+
 	/* Linear reduction */
 	G_td.ER_no_rest = G_td.ER_no;
 	printff("[original] ER rest : %d\n", G_td.ER_no_rest);
-	G_td.lr_algo = linear_reduction_algo;
+	if (G_td.r.tree_accum_algo == 1) G_td.lr_algo = linear_reduction_algo1;
+	if (G_td.r.tree_accum_algo == 2) G_td.lr_algo = linear_reduction_algo2;
+	if (G_td.r.tree_accum_algo == 3) G_td.lr_algo = linear_reduction_algo1;
 	ER_t *root = &G_td.ERs[G_td.ER_no-1];
 	root = linear_reduction(root);
 
+#else // Temporary speed up flow
+	/* Linear reduction */
+	G_td.ER_no_rest = G_td.ER_no;
+	printff("[original] ER rest : %d\n", G_td.ER_no_rest);
+	if (G_td.r.tree_accum_algo == 1) G_td.lr_algo = linear_reduction_algo1;
+	if (G_td.r.tree_accum_algo == 2) G_td.lr_algo = linear_reduction_algo1;
+	if (G_td.r.tree_accum_algo == 3) G_td.lr_algo = linear_reduction_algo1;
+	ER_t *root = &G_td.ERs[G_td.ER_no-1];
+	root = linear_reduction(root);
+
+	/* Calculate post prob */
 	if (G_td.r.tree_accum_algo == 2) {
-		/* Calc postp at a time */
-		int m = 0;
-		CvMat* featVector = cvCreateMat(1, 4, CV_32FC1);
-		for (int i=0; i<G_td.ER_no; i++) {
-			if (G_td.ER_no_array[i]) {
-				m++;
-				/* prepare features (1~3) : aspect ratio, compactness, no of holes */
-				float ar = (float)((G_td.ERs[i].r - G_td.ERs[i].l + 1) * 1.0 / (G_td.ERs[i].b - G_td.ERs[i].t + 1));  
-				float cp = (float)(sqrt((double)G_td.ERs[i].ER_size) * 1.0 / G_td.ERs[i].p);
-				float nh = (float)(1 - G_td.ERs[i].eu);
-				/* prepare feature (4) : median of horizontal crossing */
-				int h = G_td.ERs[i].b - G_td.ERs[i].t + 1;
-				int w = G_td.ERs[i].r - G_td.ERs[i].l + 1;
-				float h1 = (float)(floor(h*1.0/6));
-				float h2 = (float)(floor(h*3.0/6));
-				float h3 = (float)(floor(h*5.0/6));
-				int hc1 = 0, hc2 = 0, hc3 = 0;
-				LinkedPoint *cur = G_td.ERs[i].ER_head;
-				memset(G_td.hc1, 0, G_td.img->width*sizeof(u8));
-				memset(G_td.hc2, 0, G_td.img->width*sizeof(u8));
-				memset(G_td.hc3, 0, G_td.img->width*sizeof(u8));
-				for (int k=0; k<G_td.ERs[i].ER_size; k++, cur=cur->next) {
-					if (cur->pt.y == h1)
-						G_td.hc1[cur->pt.x] = 1;
-					if (cur->pt.y == h2)
-						G_td.hc2[cur->pt.x] = 1;
-					if (cur->pt.y == h3)
-						G_td.hc3[cur->pt.x] = 1;
-				}
-				for (int k=0; k<w-1; k++) {
-					if (G_td.hc1[k] + G_td.hc1[k+1] == 1) hc1++;
-					if (G_td.hc2[k] + G_td.hc2[k+1] == 1) hc2++;
-					if (G_td.hc3[k] + G_td.hc3[k+1] == 1) hc3++;
-				}
-				int hc[3];
-				hc[0] = hc1 + (G_td.hc1[0] + G_td.hc1[w-1]);
-				hc[1] = hc2 + (G_td.hc2[0] + G_td.hc2[w-1]);
-				hc[2] = hc3 + (G_td.hc3[0] + G_td.hc3[w-1]);
-				for (int k=2; k>0; k--) {
-					for (int j=2; j>0; j--) {
-						if (hc[j]<hc[j-1]) {
-							int tmp = hc[j-1];
-							hc[j-1] = hc[j];
-							hc[j] = tmp;
-						}
-					}
-				}
-				// calc posterior probability
-				featVector->data.fl[0] = ar;
-				featVector->data.fl[1] = cp;
-				featVector->data.fl[2] = nh;
-				featVector->data.fl[3] = (float)hc[1]; // median
-				float score = boost.predict(featVector, 0, 0, CV_WHOLE_SEQ, false, true);
-				G_td.ERs[i].label = (score>=0) ? 1 : -1;
-				G_td.ERs[i].postp = (float)(1.0/(1+exp(-2.0*abs(score))));
-				G_td.ERs[i].ar = ar;
-			}
-		}
+		calc_ER_postp();
 	}
+#endif
 
 	/* Tree accumulation */
 	int no_union = 0;
