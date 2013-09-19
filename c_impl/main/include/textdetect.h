@@ -63,6 +63,7 @@ typedef struct G_textdetect_t
 	char *input_path;        // input path
 	char *output_path;       // output path
 	char *output_fn_format;  // output filename format (Ex:"%03d") given %d is img_id
+	int global_cnt;          // global counter for patches id
 
 	// used by evaluate_ER_candidates only
 	char *groundtruth_path;  // ground truth path
@@ -82,17 +83,21 @@ typedef struct G_textdetect_t
 	u8 *hc3;
 	bool (*lr_algo)(ER_t *, ER_t *);            // linear-reduction algo
 	bool (*ta_algo)(ER_t *, int, ER_un_t *);    // tree-accumulation algo
+	int get_ER_algo;  
+#define ER_ALGO_NO_PRUNING                 0                        
+#define ER_ALGO_SIZE_VAR_WITH_AR_PENALTY   1
+#define ER_ALGO_POSTP_THEN_SIZE_VAR        2
 	int output_mode;
-#define DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE	0
-#define DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE	1
-#define SAVE_ER_AS_TEXT_FILE                    2
+#define DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE	0 // Supported by ER/MSER
+#define DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE	1 // TODO
+#define SAVE_ER_AS_TEXT_FILE                    2 // Supported by ER/MSER
+#define SAVE_ER_AS_BIN_PNG                      3 // Developing...
 
 } G_textdetect_t;
 
 extern G_textdetect_t G_td;
 
-extern void generate_ER_candidates(IplImage *img, int text_is_darker, int algo);
-extern void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo);
+extern void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
 extern void generate_MSER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
 
 #endif

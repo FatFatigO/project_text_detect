@@ -418,6 +418,65 @@ static void save_ER_as_text_file(ER_un_t *cur, int no_union)
 	fclose(f);
 }
 
+/*
+void save_ER(ER_t *T, int idx)
+{
+	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
+	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
+	LinkedPoint *cur = T->ER_head;
+	for (int j=0; j<T->ER_size; j++) {
+		img_data[cur->pt.y*(*G_td.img->step.p)+cur->pt.x] = 255;
+		cur = cur->next;
+	}
+	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
+	IplImage *dst = cvCreateImage(size, 8, 1);
+	dst->imageData = (char *)img_data;
+
+	//char filepath[100];
+	//sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/%05d.jpg", G_td.img_id, idx);
+	//cvSaveImage(filepath, dst);
+	char filepath[100], filename[64];
+	int pathlen = strlen(G_td.output_path);
+	sprintf(filename, "%05d.jpg", idx);
+	strcpy(filepath, G_td.output_path);
+	strcpy(&filepath[pathlen], filename);
+	cvSaveImage(filepath, dst);
+
+	free(img_data);
+}
+*/
+/* Save ERs as binary png */
+static void save_ER_as_binary_png(ER_un_t *cur, int no_union)
+{
+	int file_id = 0;
+	for (int i=0; i<no_union; i++, cur = cur->next) {
+
+		// check if size is too small or large
+		ER_t *T = cur->ER;
+		int rect_size = (T->b-T->t+1) * (T->r-T->l+1);
+		if ((rect_size > G_td.r.max_size) || (rect_size < G_td.r.min_size))
+			continue;
+
+		Mat img = Mat::zeros(T->b-T->t+1, T->r-T->l+1, CV_8UC1);
+		LinkedPoint *cur_pt = T->ER_head;
+		for (int j=0; j<T->ER_size; j++) {
+			img.at<uchar>(cvPoint(cur_pt->pt.x-T->l,cur_pt->pt.y-T->t)) = 255;
+			cur_pt = cur_pt->next;
+		}
+		
+		char fn[MAX_FN_LEN], img_fn[MAX_FN_LEN];
+		sprintf(img_fn, G_td.output_fn_format, G_td.global_cnt);
+		sprintf(fn, "%s/%s.png", G_td.output_path, img_fn);
+		imwrite(fn, img);
+
+		G_td.global_cnt++;
+
+		//imshow("test",img);
+		//waitKey(0);
+	}
+}
+
+
 void calc_ER_postp(void)
 {
 	/* Hook up boost classifier */
@@ -485,63 +544,83 @@ void calc_ER_postp(void)
 	}
 }
 
-void get_ER_candidates(void)
+void get_ERs_pruned_and_output()
 {
-#if 0 // fianl correct flow
-	/* Calculate post prob */
-	if (G_td.r.tree_accum_algo == 2) {
-		calc_ER_postp();
-	}
+	int no_union = 0;
+	ER_un_t *unions = NULL;
 
-	/* Linear reduction */
-	G_td.ER_no_rest = G_td.ER_no;
-	printff("[original] ER rest : %d\n", G_td.ER_no_rest);
-	if (G_td.r.tree_accum_algo == 1) G_td.lr_algo = linear_reduction_algo1;
-	if (G_td.r.tree_accum_algo == 2) G_td.lr_algo = linear_reduction_algo2;
-	if (G_td.r.tree_accum_algo == 3) G_td.lr_algo = linear_reduction_algo1;
-	ER_t *root = &G_td.ERs[G_td.ER_no-1];
-	root = linear_reduction(root);
+	if (G_td.get_ER_algo == ER_ALGO_NO_PRUNING) {
+
+		G_td.ER_un[0].ER = &G_td.ERs[0];
+		G_td.ER_un[0].prev = NULL;
+		G_td.ER_un[0].next = (G_td.ER_no>1) ? &G_td.ER_un[1] : NULL;
+		for (int i=1; i<G_td.ER_no-1; i++) {
+			G_td.ER_un[i].ER = &G_td.ERs[i];
+			G_td.ER_un[i].prev = &G_td.ER_un[i-1];
+			G_td.ER_un[i].next = &G_td.ER_un[i+1];
+		}
+		if (G_td.ER_no>1) {
+			G_td.ER_un[G_td.ER_no-1].ER = &G_td.ERs[G_td.ER_no-1];
+			G_td.ER_un[G_td.ER_no-1].prev = &G_td.ER_un[G_td.ER_no-2];
+			G_td.ER_un[G_td.ER_no-1].next = NULL;
+		}
+		no_union = G_td.ER_no;
+		unions = G_td.ER_un;
+
+	} else {
+
+#if 0 // fianl correct flow
+		/* Calculate post prob */
+		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR) {
+			calc_ER_postp();
+		}
+
+		/* Linear reduction */
+		G_td.ER_no_rest = G_td.ER_no;
+		printff("[original] ER rest : %d\n", G_td.ER_no_rest);
+		if (G_td.get_ER_algo == ER_ALGO_SIZE_VAR_WITH_AR_PENALTY) G_td.lr_algo = linear_reduction_algo1;
+		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR)      G_td.lr_algo = linear_reduction_algo2;
+		ER_t *root = &G_td.ERs[G_td.ER_no-1];
+		root = linear_reduction(root);
 
 #else // Temporary speed up flow
-	/* Linear reduction */
-	G_td.ER_no_rest = G_td.ER_no;
-	printff("[original] ER rest : %d\n", G_td.ER_no_rest);
-	if (G_td.r.tree_accum_algo == 1) G_td.lr_algo = linear_reduction_algo1;
-	if (G_td.r.tree_accum_algo == 2) G_td.lr_algo = linear_reduction_algo1;
-	if (G_td.r.tree_accum_algo == 3) G_td.lr_algo = linear_reduction_algo1;
-	ER_t *root = &G_td.ERs[G_td.ER_no-1];
-	root = linear_reduction(root);
+		/* Linear reduction */
+		G_td.ER_no_rest = G_td.ER_no;
+		printff("[original] ER rest : %d\n", G_td.ER_no_rest);
+		if (G_td.get_ER_algo == ER_ALGO_SIZE_VAR_WITH_AR_PENALTY) G_td.lr_algo = linear_reduction_algo1;
+		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR)      G_td.lr_algo = linear_reduction_algo1;
+		ER_t *root = &G_td.ERs[G_td.ER_no-1];
+		root = linear_reduction(root);
 
-	/* Calculate post prob */
-	if (G_td.r.tree_accum_algo == 2) {
-		calc_ER_postp();
-	}
+		/* Calculate post prob */
+		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR) {
+			calc_ER_postp();
+		}
 #endif
-
-	/* Tree accumulation */
-	int no_union = 0;
-	printff("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
-	if (G_td.r.tree_accum_algo == 1) G_td.ta_algo = tree_accumulation_algo1;
-	if (G_td.r.tree_accum_algo == 2) G_td.ta_algo = tree_accumulation_algo2;
-	if (G_td.r.tree_accum_algo == 3) G_td.ta_algo = tree_accumulation_algo3;
-	ER_un_t *C_union = tree_accumulation(root, &no_union);
-	printff("[tr_accum] ER rest : %d\n", no_union);
+		/* Tree accumulation */
+		printff("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
+		if (G_td.get_ER_algo == ER_ALGO_SIZE_VAR_WITH_AR_PENALTY) G_td.ta_algo = tree_accumulation_algo1;
+		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR)      G_td.ta_algo = tree_accumulation_algo2;
+		unions = tree_accumulation(root, &no_union);
+		printff("[tr_accum] ER rest : %d\n", no_union);
+	}
 
 	/* output results */
 	if ((G_td.output_mode == DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE) || (G_td.output_mode == DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE))
-		draw_ER_rectangle_in_original_image_and_save(C_union, no_union);
+		draw_ER_rectangle_in_original_image_and_save(unions, no_union);
 	else if (G_td.output_mode == SAVE_ER_AS_TEXT_FILE)
-		save_ER_as_text_file(C_union, no_union);
+		save_ER_as_text_file(unions, no_union);
+	else if (G_td.output_mode == SAVE_ER_AS_BIN_PNG)
+		save_ER_as_binary_png(unions, no_union);
 }
 
-void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker, int algo)
+void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker)
 {
 	G_td.img = img;                                // input image
 	G_td.img_chan = img_chan;                      // image channel name
 	G_td.img_id = img_id;                          // image id
 	G_td.img_resize_ratio = img_resize_ratio;      // resize ratio
 	G_td.r.text_is_darker = text_is_darker;        // text is darker than background or not
-	G_td.r.tree_accum_algo = algo;                 // 1,2,3
 	
 	/* The following are default value, can be changed here */
 	G_td.r.min_reg2img_ratio = 0.001;              // min region to img ratio
@@ -585,8 +664,10 @@ void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_
 	assert(G_td.hc2 != NULL);
 	assert(G_td.hc3 != NULL);
 
-	// get ER candidates
-	get_ER_candidates();
+	// get pruned ER candidates
+	get_ERs_pruned_and_output();
+
+	// release resource
 	free(ERs);
 	free(pts);
 	for (int i=0; i<ER_no; i++) {
@@ -596,13 +677,5 @@ void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_
 	free(G_td.featraw);
 	free(G_td.ER_no_array);
 	free(G_td.ER_un);
-}
-
-void generate_ER_candidates(IplImage *img, int text_is_darker, int algo)
-{
-	int img_id = 0;
-	char img_chan = ' ';
-	float img_resize_ratio = 1.0;
-	generate_ER_candidates(img, img_id, img_chan, img_resize_ratio, text_is_darker, algo);
 }
 

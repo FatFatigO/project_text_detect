@@ -24,7 +24,6 @@ int ICDAR2013_generate_ER_candidates(void)
 {
 	int ICDAR_2013_start_img_no = 82;
 	int ICDAR_2013_end_img_no = 82;//233
-	int algo = 2;
 	int max_width = 1600;
 
 	// process each images
@@ -63,12 +62,12 @@ int ICDAR2013_generate_ER_candidates(void)
 		cvSplit(img, y, u, v, NULL);
 
 		// generate ER candidates
-		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 0, algo);
-		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 1, algo);
-		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 0, algo);
-		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 1, algo);
-		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 0, algo);
-		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 1, algo);
+		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 0);
+		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 1);
+		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 0);
+		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 1);
+		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 0);
+		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 1);
 
 		// free resource
 		cvReleaseImage(&y);
@@ -318,24 +317,32 @@ int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 	return 0;
 }
 
-int init_path()
+int init()
 {
-	/* Ground truth */
+	memset(&G_td, 0, sizeof(G_td));
+
+	// Ground truth
 	sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png");
 	//sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt");
 
-	/* Input */
+	// Input
 	sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
 	//sprintf(in, "../../../../../TestResult/ICDAR_2013/ER_a3/txt");
 
-	/* Output */
+	// Output
 	sprintf(out, "../../../../../TestResult/ICDAR_2013");
 	G_td.output_fn_format = "img_%d";
 
-	/* Output mode */
-	G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
+	// Output mode
+	G_td.output_mode = SAVE_ER_AS_BIN_PNG;
+	//G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
 	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
 	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
+
+	// Get ER algo
+	G_td.get_ER_algo = ER_ALGO_NO_PRUNING;                    
+	//G_td.get_ER_algo = ER_ALGO_SIZE_VAR_WITH_AR_PENALTY;
+	//G_td.get_ER_algo = ER_ALGO_POSTP_THEN_SIZE_VAR;
 
 	// check if in / out path exists
 	struct stat s;
@@ -354,16 +361,16 @@ int init_path()
 	G_td.groundtruth_path = in_gdtr;
 	G_td.input_path = in;
 	G_td.output_path = out;
-	
+
 	return 0;
 }
 
 void main(void) 
 {
-	if (init_path() == -1) {int c; scanf("%c",&c); return;}
+	if (init() == -1) {int c; scanf("%c",&c); return;}
 
 	//ICDAR2013_generate_MSER_candidates();
-	//ICDAR2013_generate_ER_candidates();
+	ICDAR2013_generate_ER_candidates();
 	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt();
