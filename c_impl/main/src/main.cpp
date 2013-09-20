@@ -22,20 +22,23 @@ char in_gdtr[MAX_FN_LEN], in[MAX_FN_LEN], out[MAX_FN_LEN];
 
 int ICDAR2013_generate_ER_candidates(void)
 {
-	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 233;//233
 	int max_width = 1600;
 
 	// process each images
-	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+	for (int img_id = G_td.img_start; img_id <= G_td.img_end; img_id++) {
 
 		float img_resize_ratio = 1.0;
 
 		// load image
 		char fn[128];
+		Mat img_rgb, img_yuv, img_yuv_ok;
 		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, img_id);
-		Mat img_rgb = imread(fn, CV_LOAD_IMAGE_COLOR);
-		Mat img_yuv, img_yuv_ok;
+		img_rgb = imread(fn, CV_LOAD_IMAGE_COLOR);
+		if (img_rgb.dims == 0) {
+			sprintf(fn, "%s/img_%d.png", G_td.input_path, img_id);
+			img_rgb = imread(fn, CV_LOAD_IMAGE_COLOR);
+		}
+		assert(img_rgb.dims>0);
 		cvtColor(img_rgb, img_yuv, CV_RGB2YUV);
 		G_td.img_orig_rgb = &img_rgb;
 		G_td.img_orig_yuv = &img_yuv;
@@ -72,6 +75,7 @@ int ICDAR2013_generate_ER_candidates(void)
 			generate_ER_candidates(G_td.img_orig_v, img_id, 'v', img_resize_ratio, 0);
 			generate_ER_candidates(G_td.img_orig_v, img_id, 'v', img_resize_ratio, 1);
 		}
+		printf("img %d is done.\n", img_id);
 	}
 
 	return 0;
@@ -79,12 +83,10 @@ int ICDAR2013_generate_ER_candidates(void)
 
 int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 {
-	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 233;//233
+	double recall = 0;
 
 	// process each images
-	double recall = 0;
-	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+	for (int img_id = G_td.img_start; img_id <= G_td.img_end; img_id++) {
 
 		// load ground truth
 		char fn_gt[MAX_FN_LEN];
@@ -137,9 +139,8 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 	sprintf(fn_out, "%s/Recall_rate_rectangle_level.txt", G_td.output_path);
 	FILE *f_out = fopen(fn_out, "w");
 	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
-			ICDAR_2013_start_img_no,
-			ICDAR_2013_end_img_no,
-			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
+			G_td.img_start, G_td.img_end,
+			recall / (G_td.img_end-G_td.img_start+1));
 	fclose(f_out);
 
 	return 0;
@@ -147,12 +148,10 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 
 int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
 {
-	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 233;//233
+	double recall = 0;
 
 	// process each images
-	double recall = 0;
-	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+	for (int img_id = G_td.img_start; img_id <= G_td.img_end; img_id++) {
 
 		// load ground truth
 		char fn_gt[MAX_FN_LEN];
@@ -193,9 +192,8 @@ int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
 	sprintf(fn_out, "%s/Recall_rate_pixel_level.txt", G_td.output_path);
 	FILE *f_out = fopen(fn_out, "w");
 	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
-			ICDAR_2013_start_img_no,
-			ICDAR_2013_end_img_no,
-			recall / (ICDAR_2013_end_img_no-ICDAR_2013_start_img_no+1));
+			G_td.img_start, G_td.img_end,
+			recall / (G_td.img_end-G_td.img_start+1));
 	fclose(f_out);
 
 	return 0;
@@ -203,9 +201,6 @@ int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
 
 int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 {
-	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 233;//233
-
 	// write output data
 	char fn_out[MAX_FN_LEN];
 	sprintf(fn_out, "%s/Statistics.txt", G_td.output_path);
@@ -214,7 +209,7 @@ int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 
 	// process each images
 	int total = 0;
-	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
+	for (int img_id = G_td.img_start; img_id <= G_td.img_end; img_id++) {
 
 		// load input file
 		char fn_in[MAX_FN_LEN];
@@ -246,9 +241,44 @@ int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 	return 0;
 }
 
+int ICDAR2013_random_copy_n_ERs_from_one_to_another_folder()
+{
+	int n = 2500;
+
+	uchar *used = (uchar *)malloc((G_td.img_end-G_td.img_start+1)*sizeof(uchar));
+	memset(used, 0, (G_td.img_end-G_td.img_start+1)*sizeof(uchar));
+	int *map = (int *)malloc(n*sizeof(int));
+	memset(map, 0, n*sizeof(int));
+
+	RNG rng(0xFFFFFFFF);
+	for (int i=0; i<n; i++) {
+		int idx = 0;
+		do {
+			idx = rng.uniform(G_td.img_start, G_td.img_end);
+		} while (used[idx] == 1);
+		used[idx] = 1;
+		map[i] = idx;
+	}
+
+	char img_fn[MAX_FN_LEN], fn_src[MAX_FN_LEN], fn_dst[MAX_FN_LEN];
+	for (int i=0; i<n; i++) {
+		sprintf(img_fn, G_td.output_fn_format, map[i]);
+		sprintf(fn_src, "%s/%s.png", G_td.input_path, img_fn);
+		sprintf(fn_dst, "%s/%s.png", G_td.output_path, img_fn);
+		Mat img = imread(fn_src);
+		imwrite(fn_dst, img);
+	}
+
+	return 0;
+}
+
 int init()
 {
 	memset(&G_td, 0, sizeof(G_td));
+
+	G_td.global_cnt = 0;//970190;
+	G_td.img_start = 1;//301;
+	G_td.img_end = 1466742;//233(Test),410(Trian),1466742(TrainERs)
 
 	// Ground truth
 	//sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png");
@@ -256,21 +286,22 @@ int init()
 
 	// Input
 	//sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
-	sprintf(in, "../../../../../TestResult/ICDAR_2013/txt/MSER");
+	//sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTrain");
+	sprintf(in, "../../../../../TestResult/ICDAR_2013/Train_ER_all");
 
 	// Output
-	sprintf(out, "../../../../../TestResult/ICDAR_2013");
+	sprintf(out, "../../../../../TestResult/ICDAR_2013/Train_ER_selected");
 	G_td.output_fn_format = "img_%d";
 
 	// Output mode
-	//G_td.output_mode = SAVE_ER_AS_BIN_PNG;
-	G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
+	G_td.output_mode = SAVE_ER_AS_BIN_PNG;
+	//G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
 	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
 	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
 
 	// Get ER algo
-	G_td.get_ER_algo = MSER_ORGINAL;
-	//G_td.get_ER_algo = ER_NO_PRUNING;
+	//G_td.get_ER_algo = MSER_ORGINAL;
+	G_td.get_ER_algo = ER_NO_PRUNING;
 	//G_td.get_ER_algo = ER_SIZE_VAR_WITH_AR_PENALTY;
 	//G_td.get_ER_algo = ER_POSTP_THEN_SIZE_VAR;
 
@@ -299,8 +330,9 @@ void main(void)
 {
 	if (init() == -1) {int c; scanf("%c",&c); return;}
 
+	//ICDAR2013_random_copy_n_ERs_from_one_to_another_folder();
 	//ICDAR2013_generate_ER_candidates();
 	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();
-	ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt();
+	//ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt();
 }

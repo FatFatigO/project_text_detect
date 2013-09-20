@@ -67,6 +67,8 @@ typedef struct G_textdetect_t
 	char *output_path;       // output path
 	char *output_fn_format;  // output filename format (Ex:"%03d") given %d is img_id
 	int global_cnt;          // global counter for patches id
+	int img_start;           // start image index
+	int img_end;             // end image index
 
 	// used by evaluate_ER_candidates only
 	char *groundtruth_path;  // ground truth path
