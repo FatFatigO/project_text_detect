@@ -54,9 +54,12 @@ typedef struct rules_t
 typedef struct G_textdetect_t
 {
 	// shared info
-	IplImage *img_orig_rgb;  // original rgb image
-	IplImage *img_orig_yuv;  // original yuv image
-	IplImage *img;           // current image
+	Mat *img_orig_rgb;       // original rgb image
+	Mat *img_orig_yuv;       // original yuv image
+	Mat *img_orig_y;         // original y image
+	Mat *img_orig_u;         // original u image
+	Mat *img_orig_v;         // original v image
+	Mat *img;                // current image
 	int img_id;              // current image id
 	float img_resize_ratio;  // resize ratio (dst/src)
 	char img_chan;           // current image channeld
@@ -84,9 +87,10 @@ typedef struct G_textdetect_t
 	bool (*lr_algo)(ER_t *, ER_t *);            // linear-reduction algo
 	bool (*ta_algo)(ER_t *, int, ER_un_t *);    // tree-accumulation algo
 	int get_ER_algo;  
-#define ER_ALGO_NO_PRUNING                 0                        
-#define ER_ALGO_SIZE_VAR_WITH_AR_PENALTY   1
-#define ER_ALGO_POSTP_THEN_SIZE_VAR        2
+#define ER_NO_PRUNING                 0                        
+#define ER_SIZE_VAR_WITH_AR_PENALTY   1
+#define ER_POSTP_THEN_SIZE_VAR        2
+#define MSER_ORGINAL                  3
 	int output_mode;
 #define DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE	0 // Supported by ER/MSER
 #define DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE	1 // TODO
@@ -97,7 +101,7 @@ typedef struct G_textdetect_t
 
 extern G_textdetect_t G_td;
 
-extern void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
-extern void generate_MSER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
+extern void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
+extern void generate_MSER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker);
 
 #endif

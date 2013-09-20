@@ -21,7 +21,7 @@ static const Vec3b bcolors[] =
 /* Draw ER rectangle in original image and save as jpg */
 static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> contours)
 {
-	IplImage *img;
+	Mat img;
 	char fn[128], img_fn[128];
 
 	// check if output image exist
@@ -34,13 +34,13 @@ static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> c
     }
 	if (file_exist) {
 		// load from output path
-		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		img = imread(fn, CV_LOAD_IMAGE_COLOR);
 	} else {
 		// save original color image first
-		img = cvCloneImage(G_td.img_orig_rgb);
+		img = *G_td.img_orig_rgb;
 		sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
 		sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
-		cvSaveImage(fn, img);
+		imwrite(fn, img);
 	}
 
 	/*
@@ -61,7 +61,7 @@ static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> c
 		color = CV_RGB(0, 0, 255);
 	for (int i = (int)contours.size()-1; i >= 0; i--) {
 		const vector<Point>& reg = contours[i];
-		int r = 0, b = 0, l = G_td.img->width-1, t = G_td.img->height-1;
+		int r = 0, b = 0, l = G_td.img->cols-1, t = G_td.img->rows-1;
 		for ( int j = 0; j < (int)reg.size(); j++ ) {
 			Point pt = reg[j];
 			l = min(l, pt.x);
@@ -69,21 +69,20 @@ static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> c
 			t = min(t, pt.y);
 			b = max(b, pt.y);
 		}
-		cvRectangle(img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
 	}
 	
 	// save image
 	sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
 	sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
-	cvSaveImage(fn, img);
-	cvReleaseImage(&img);
+	imwrite(fn, img);
 }
 
 /* Save ERs as text file */
@@ -94,11 +93,11 @@ static void save_ER_as_text_file(vector<vector<Point>> contours)
 	sprintf(fn, "%s/%s.txt", G_td.output_path, img_fn);
 	FILE *f = fopen(fn, "a");
 
-	Mat yuv = Mat(G_td.img_orig_yuv, 0);
+	Mat yuv = *G_td.img_orig_yuv;
 
 	for (int i = (int)contours.size()-1; i >= 0; i--) {
 		const vector<Point>& reg = contours[i];
-		int r = 0, b = 0, l = G_td.img->width-1, t = G_td.img->height-1;
+		int r = 0, b = 0, l = G_td.img->cols-1, t = G_td.img->rows-1;
 		Vec3d sum = 0.0;
 		for ( int j = 0; j < (int)reg.size(); j++ ) {
 			Point pt = reg[j];
@@ -130,7 +129,7 @@ static void save_ER_as_text_file(vector<vector<Point>> contours)
 }
 
 
-void generate_MSER_candidates(IplImage *in_img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker)
+void generate_MSER_candidates(Mat *in_img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker)
 {
 	// save some parameters
 	G_td.img = in_img;                             // input image
@@ -140,27 +139,18 @@ void generate_MSER_candidates(IplImage *in_img, int img_id, char img_chan, float
 	G_td.r.text_is_darker = text_is_darker;        // text is darker than background or not
 
 	// inverse if needed
-	if (text_is_darker) {
-		char *data = G_td.img->imageData;
-		for (int h = 0; h<G_td.img->height; h++) {
-			char *p = &data[h*G_td.img->widthStep];
-			for (int w = 0; w<G_td.img->width; w++) {
-				*p = 255 - *p;
-				p = p + 1;
-			}
-		}
-	}
+	if (text_is_darker)
+		*G_td.img = 255 - *G_td.img;
 
 	// extract MSER into contours
 	vector<vector<Point>> contours;
-	int delta=5; int min_area=60; int max_area=in_img->width * in_img->height / 5;
+	int delta=5; int min_area=60; int max_area=in_img->cols * in_img->rows / 5;
 	double max_variation=0.25; double min_diversity=0.7;
     int max_evolution=200; double area_threshold=1.01;
     double min_margin=0.003; int edge_blur_size=5;
 	MSER mser4 = MSER(delta, min_area, max_area, max_variation, min_diversity,
 						max_evolution, area_threshold, min_margin, edge_blur_size);
-	mser4(in_img, contours);
-	Mat img = Mat(in_img,0);
+	mser4(*in_img, contours);
 
 	/* output results */
 	if ((G_td.output_mode == DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE) || (G_td.output_mode == DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE))

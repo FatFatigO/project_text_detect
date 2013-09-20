@@ -342,7 +342,7 @@ ER_t *linear_reduction(ER_t *T)
 /* Draw ER rectangle in original image and save as jpg */
 static void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_union)
 {
-	IplImage *img;
+	Mat img;
 	char fn[128], img_fn[128];
 
 	// check if output image exist
@@ -355,13 +355,13 @@ static void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_un
     }
 	if (file_exist) {
 		// load from output path
-		img = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
+		img = imread(fn, CV_LOAD_IMAGE_COLOR);
 	} else {
 		// save original color image first
-		img = cvCloneImage(G_td.img_orig_rgb);
+		img = *G_td.img_orig_rgb;
 		sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
 		sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
-		cvSaveImage(fn, img);
+		imwrite(fn, img);
 	}
 
 	// draw rect
@@ -374,21 +374,20 @@ static void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_un
 		color = CV_RGB(0, 0, 255);
 	for (int i=0; i<no_union; i++, cur=cur->next) {
 		ER_t *T = cur->ER;
-		cvRectangle(img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
-						 cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
+		cvRectangle(&img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
+						  cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
 	}
 	
 	// save image
 	sprintf(img_fn, G_td.output_fn_format, G_td.img_id);
 	sprintf(fn, "%s/%s.jpg", G_td.output_path, img_fn);
-	cvSaveImage(fn, img);
-	cvReleaseImage(&img);
+	imwrite(fn, img);
 }
 
 /* Save ERs as text file */
@@ -404,8 +403,12 @@ static void save_ER_as_text_file(ER_un_t *cur, int no_union)
 						  (int)((T->t)*1.0/G_td.img_resize_ratio),
 						  (int)((T->r-T->l+1)*1.0/G_td.img_resize_ratio),
 						  (int)((T->b-T->t+1)*1.0/G_td.img_resize_ratio));
-		cvSetImageROI(G_td.img_orig_yuv, r);
-		CvScalar mean = cvAvg(G_td.img_orig_yuv);
+		Vec3d sum = 0.0;
+		LinkedPoint *cur_pt = T->ER_head;
+		for (int j=0; j<T->ER_size; j++) {
+			sum += G_td.img_orig_yuv->at<Vec3b>(cvPoint(cur_pt->pt.x,cur_pt->pt.y));
+			cur_pt = cur_pt->next;
+		}
 		int base;
 		if (G_td.img_chan == 'y') base = 0;
 		if (G_td.img_chan == 'u') base = 2;
@@ -413,38 +416,13 @@ static void save_ER_as_text_file(ER_un_t *cur, int no_union)
 		int chan = base + G_td.r.text_is_darker;
 		fprintf(f, "%d	%d	%d	%d	%f	%f	%f	%d\n", 
 				r.x, r.y, r.width, r.height,
-				mean.val[0], mean.val[1], mean.val[2], chan);
+				sum.val[0]/T->ER_size,
+				sum.val[1]/T->ER_size,
+				sum.val[2]/T->ER_size, chan);
 	}
 	fclose(f);
 }
 
-/*
-void save_ER(ER_t *T, int idx)
-{
-	u8 *img_data = (u8 *)malloc(G_td.img->rows*(*G_td.img->step.p)*sizeof(u8)); 
-	memset(img_data, 0, G_td.img->rows*(*G_td.img->step.p)*sizeof(u8));
-	LinkedPoint *cur = T->ER_head;
-	for (int j=0; j<T->ER_size; j++) {
-		img_data[cur->pt.y*(*G_td.img->step.p)+cur->pt.x] = 255;
-		cur = cur->next;
-	}
-	CvSize size = {(*G_td.img->step.p), G_td.img->rows};
-	IplImage *dst = cvCreateImage(size, 8, 1);
-	dst->imageData = (char *)img_data;
-
-	//char filepath[100];
-	//sprintf(filepath,"../../../../../../../LargeFiles/c_impl/0412/[%03d]/%05d.jpg", G_td.img_id, idx);
-	//cvSaveImage(filepath, dst);
-	char filepath[100], filename[64];
-	int pathlen = strlen(G_td.output_path);
-	sprintf(filename, "%05d.jpg", idx);
-	strcpy(filepath, G_td.output_path);
-	strcpy(&filepath[pathlen], filename);
-	cvSaveImage(filepath, dst);
-
-	free(img_data);
-}
-*/
 /* Save ERs as binary png */
 static void save_ER_as_binary_png(ER_un_t *cur, int no_union)
 {
@@ -502,9 +480,9 @@ void calc_ER_postp(void)
 			float h3 = (float)(floor(h*5.0/6));
 			int hc1 = 0, hc2 = 0, hc3 = 0;
 			LinkedPoint *cur = G_td.ERs[i].ER_head;
-			memset(G_td.hc1, 0, G_td.img->width*sizeof(u8));
-			memset(G_td.hc2, 0, G_td.img->width*sizeof(u8));
-			memset(G_td.hc3, 0, G_td.img->width*sizeof(u8));
+			memset(G_td.hc1, 0, G_td.img->cols*sizeof(u8));
+			memset(G_td.hc2, 0, G_td.img->cols*sizeof(u8));
+			memset(G_td.hc3, 0, G_td.img->cols*sizeof(u8));
 			for (int k=0; k<G_td.ERs[i].ER_size; k++, cur=cur->next) {
 				if (cur->pt.y == h1)
 					G_td.hc1[cur->pt.x] = 1;
@@ -549,7 +527,7 @@ void get_ERs_pruned_and_output()
 	int no_union = 0;
 	ER_un_t *unions = NULL;
 
-	if (G_td.get_ER_algo == ER_ALGO_NO_PRUNING) {
+	if (G_td.get_ER_algo == ER_NO_PRUNING) {
 
 		G_td.ER_un[0].ER = &G_td.ERs[0];
 		G_td.ER_un[0].prev = NULL;
@@ -571,15 +549,15 @@ void get_ERs_pruned_and_output()
 
 #if 0 // fianl correct flow
 		/* Calculate post prob */
-		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR) {
+		if (G_td.get_ER_algo == ER_POSTP_THEN_SIZE_VAR) {
 			calc_ER_postp();
 		}
 
 		/* Linear reduction */
 		G_td.ER_no_rest = G_td.ER_no;
 		printff("[original] ER rest : %d\n", G_td.ER_no_rest);
-		if (G_td.get_ER_algo == ER_ALGO_SIZE_VAR_WITH_AR_PENALTY) G_td.lr_algo = linear_reduction_algo1;
-		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR)      G_td.lr_algo = linear_reduction_algo2;
+		if (G_td.get_ER_algo == ER_SIZE_VAR_WITH_AR_PENALTY) G_td.lr_algo = linear_reduction_algo1;
+		if (G_td.get_ER_algo == ER_POSTP_THEN_SIZE_VAR)      G_td.lr_algo = linear_reduction_algo2;
 		ER_t *root = &G_td.ERs[G_td.ER_no-1];
 		root = linear_reduction(root);
 
@@ -587,20 +565,20 @@ void get_ERs_pruned_and_output()
 		/* Linear reduction */
 		G_td.ER_no_rest = G_td.ER_no;
 		printff("[original] ER rest : %d\n", G_td.ER_no_rest);
-		if (G_td.get_ER_algo == ER_ALGO_SIZE_VAR_WITH_AR_PENALTY) G_td.lr_algo = linear_reduction_algo1;
-		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR)      G_td.lr_algo = linear_reduction_algo1;
+		if (G_td.get_ER_algo == ER_SIZE_VAR_WITH_AR_PENALTY) G_td.lr_algo = linear_reduction_algo1;
+		if (G_td.get_ER_algo == ER_POSTP_THEN_SIZE_VAR)      G_td.lr_algo = linear_reduction_algo1;
 		ER_t *root = &G_td.ERs[G_td.ER_no-1];
 		root = linear_reduction(root);
 
 		/* Calculate post prob */
-		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR) {
+		if (G_td.get_ER_algo == ER_POSTP_THEN_SIZE_VAR) {
 			calc_ER_postp();
 		}
 #endif
 		/* Tree accumulation */
 		printff("[li_reduc] ER rest : %d\n", G_td.ER_no_rest);
-		if (G_td.get_ER_algo == ER_ALGO_SIZE_VAR_WITH_AR_PENALTY) G_td.ta_algo = tree_accumulation_algo1;
-		if (G_td.get_ER_algo == ER_ALGO_POSTP_THEN_SIZE_VAR)      G_td.ta_algo = tree_accumulation_algo2;
+		if (G_td.get_ER_algo == ER_SIZE_VAR_WITH_AR_PENALTY) G_td.ta_algo = tree_accumulation_algo1;
+		if (G_td.get_ER_algo == ER_POSTP_THEN_SIZE_VAR)      G_td.ta_algo = tree_accumulation_algo2;
 		unions = tree_accumulation(root, &no_union);
 		printff("[tr_accum] ER rest : %d\n", no_union);
 	}
@@ -614,7 +592,7 @@ void get_ERs_pruned_and_output()
 		save_ER_as_binary_png(unions, no_union);
 }
 
-void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker)
+void generate_ER_candidates(Mat *img, int img_id, char img_chan, float img_resize_ratio, int text_is_darker)
 {
 	G_td.img = img;                                // input image
 	G_td.img_chan = img_chan;                      // image channel name
@@ -633,12 +611,13 @@ void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_
 	}
 	
 	// get ERs
-	ER_t *ERs = (ER_t *)malloc(img->height*img->width*sizeof(ERs[0]));
+	ER_t *ERs = (ER_t *)malloc(img->rows*img->cols*sizeof(ERs[0]));
 	assert(ERs != NULL);
 	G_td.ERs = ERs;
-	LinkedPoint *pts = (LinkedPoint*)malloc((img->height*img->width+1)*sizeof(pts[0]));
+	LinkedPoint *pts = (LinkedPoint*)malloc((img->rows*img->cols+1)*sizeof(pts[0]));
 	assert(pts != NULL);
-	int ER_no = get_ERs((u8 *)img->imageData, img->height, img->width, img->widthStep, !G_td.r.text_is_darker/*2:see debug msg*/, ERs, pts);
+	Mat im = img->clone();
+	int ER_no = get_ERs((u8 *)im.data, im.rows, im.cols, im.step, !G_td.r.text_is_darker/*2:see debug msg*/, ERs, pts);
 
 	// assign some global variables
 	G_td.ER_no = ER_no;
@@ -654,12 +633,12 @@ void generate_ER_candidates(IplImage *img, int img_id, char img_chan, float img_
 	G_td.ER_un = (ER_un_t *)malloc(ER_no*sizeof(ER_un_t));
 	assert(G_td.ER_un != NULL);
 	memset(G_td.ER_un, 0 , ER_no*sizeof(ER_un_t));
-	G_td.r.max_size = (int)(G_td.r.max_reg2img_ratio * img->width * img->height);//from ratio to real size
-	G_td.r.min_size = (int)(G_td.r.min_reg2img_ratio * img->width * img->height);//from ratio to real size
+	G_td.r.max_size = (int)(G_td.r.max_reg2img_ratio * img->cols * img->rows);//from ratio to real size
+	G_td.r.min_size = (int)(G_td.r.min_reg2img_ratio * img->cols * img->rows);//from ratio to real size
 	G_td.r.min_size = MAX(G_td.r.min_size, 64);
-	G_td.hc1 = (u8 *)malloc(img->width*sizeof(u8));
-	G_td.hc2 = (u8 *)malloc(img->width*sizeof(u8));
-	G_td.hc3 = (u8 *)malloc(img->width*sizeof(u8));
+	G_td.hc1 = (u8 *)malloc(img->cols*sizeof(u8));
+	G_td.hc2 = (u8 *)malloc(img->cols*sizeof(u8));
+	G_td.hc3 = (u8 *)malloc(img->cols*sizeof(u8));
 	assert(G_td.hc1 != NULL);
 	assert(G_td.hc2 != NULL);
 	assert(G_td.hc3 != NULL);

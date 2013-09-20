@@ -22,127 +22,56 @@ char in_gdtr[MAX_FN_LEN], in[MAX_FN_LEN], out[MAX_FN_LEN];
 
 int ICDAR2013_generate_ER_candidates(void)
 {
-	int ICDAR_2013_start_img_no = 82;
-	int ICDAR_2013_end_img_no = 82;//233
-	int max_width = 1600;
-
-	// process each images
-	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
-
-		float img_resize_ratio = 1.0;
-		bool resize = 0;
-		CvSize size;
-
-		// load image
-		char fn[128];
-		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, img_id);
-		IplImage *img_rgb = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
-		IplImage *img_yuv = cvCloneImage(img_rgb);
-		cvCvtColor(img_rgb, img_yuv, CV_RGB2YUV);
-		G_td.img_orig_rgb = img_rgb;
-		G_td.img_orig_yuv = img_yuv;
-
-		// resize if needed
-		IplImage *img = img_yuv;
-		if (img->width > max_width) {
-			resize = true;
-			img_resize_ratio = max_width*1.0f / img->width;
-			size = cvSize(max_width, (int)(img->height*img_resize_ratio));
-			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
-			cvResize(img, img_rs);
-			img = img_rs;
-		} else {
-			size = cvGetSize(img);
-		}
-
-		// get y,u,v channel images
-		IplImage *y = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
-		cvSplit(img, y, u, v, NULL);
-
-		// generate ER candidates
-		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 0);
-		generate_ER_candidates(y, img_id, 'y', img_resize_ratio, 1);
-		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 0);
-		generate_ER_candidates(u, img_id, 'u', img_resize_ratio, 1);
-		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 0);
-		generate_ER_candidates(v, img_id, 'v', img_resize_ratio, 1);
-
-		// free resource
-		cvReleaseImage(&y);
-		cvReleaseImage(&u);
-		cvReleaseImage(&v);
-		if (G_td.img_orig_rgb != NULL) 
-			cvReleaseImage(&G_td.img_orig_rgb);
-		if (G_td.img_orig_yuv != NULL) 
-			cvReleaseImage(&G_td.img_orig_yuv);
-		if (resize) 
-			cvReleaseImage(&img); //img_rs
-	}
-
-	return 0;
-}
-
-int ICDAR2013_generate_MSER_candidates(void)
-{
 	int ICDAR_2013_start_img_no = 1;
-	int ICDAR_2013_end_img_no = 1;//233
+	int ICDAR_2013_end_img_no = 233;//233
 	int max_width = 1600;
 
 	// process each images
 	for (int img_id = ICDAR_2013_start_img_no; img_id <= ICDAR_2013_end_img_no; img_id++) {
 
 		float img_resize_ratio = 1.0;
-		bool resize = 0;
-		CvSize size;
 
 		// load image
 		char fn[128];
 		sprintf(fn, "%s/img_%d.jpg", G_td.input_path, img_id);
-		IplImage *img_rgb = cvLoadImage(fn, CV_LOAD_IMAGE_COLOR);
-		IplImage *img_yuv = cvCloneImage(img_rgb);
-		cvCvtColor(img_rgb, img_yuv, CV_RGB2YUV);
-		G_td.img_orig_rgb = img_rgb;
-		G_td.img_orig_yuv = img_yuv;
+		Mat img_rgb = imread(fn, CV_LOAD_IMAGE_COLOR);
+		Mat img_yuv, img_yuv_ok;
+		cvtColor(img_rgb, img_yuv, CV_RGB2YUV);
+		G_td.img_orig_rgb = &img_rgb;
+		G_td.img_orig_yuv = &img_yuv;
 
 		// resize if needed
-		IplImage *img = img_yuv;
-		if (img->width > max_width) {
-			resize = true;
-			img_resize_ratio = max_width*1.0f / img->width;
-			size = cvSize(max_width, (int)(img->height*img_resize_ratio));
-			IplImage *img_rs = cvCreateImage(size, img->depth, img->nChannels);
-			cvResize(img, img_rs);
-			img = img_rs;
+		if (img_yuv.rows > max_width) {
+			img_resize_ratio = max_width*1.0f / img_yuv.rows;
+			cv::resize(img_yuv, img_yuv_ok, Size(max_width, (int)(img_yuv.cols*img_resize_ratio)));
 		} else {
-			size = cvGetSize(img);
+			img_yuv_ok = img_yuv;
 		}
 
 		// get y,u,v channel images
-		IplImage *y = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *u = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1),
-				 *v = cvCreateImage(size, IPL_DEPTH_8U, CV_8UC1);
-		cvSplit(img, y, u, v, NULL);
+		vector<Mat> chans;
+		split(img_yuv_ok, chans);
+		G_td.img_orig_y = &chans[0];
+		G_td.img_orig_u = &chans[1];
+		G_td.img_orig_v = &chans[2];
 
-		// generate MSER candidates
-		generate_MSER_candidates(y, img_id, 'y', img_resize_ratio, 0);
-		generate_MSER_candidates(y, img_id, 'y', img_resize_ratio, 1);
-		generate_MSER_candidates(u, img_id, 'u', img_resize_ratio, 0);
-		generate_MSER_candidates(u, img_id, 'u', img_resize_ratio, 1);
-		generate_MSER_candidates(v, img_id, 'v', img_resize_ratio, 0);
-		generate_MSER_candidates(v, img_id, 'v', img_resize_ratio, 1);
-
-		// free resource
-		cvReleaseImage(&y);
-		cvReleaseImage(&u);
-		cvReleaseImage(&v);
-		if (G_td.img_orig_rgb != NULL) 
-			cvReleaseImage(&G_td.img_orig_rgb);
-		if (G_td.img_orig_yuv != NULL) 
-			cvReleaseImage(&G_td.img_orig_yuv);
-		if (resize) 
-			cvReleaseImage(&img); //img_rs
+		if (G_td.get_ER_algo == MSER_ORGINAL) {
+			// generate MSER candidates
+			generate_MSER_candidates(G_td.img_orig_y, img_id, 'y', img_resize_ratio, 0);
+			generate_MSER_candidates(G_td.img_orig_y, img_id, 'y', img_resize_ratio, 1);
+			generate_MSER_candidates(G_td.img_orig_u, img_id, 'u', img_resize_ratio, 0);
+			generate_MSER_candidates(G_td.img_orig_u, img_id, 'u', img_resize_ratio, 1);
+			generate_MSER_candidates(G_td.img_orig_v, img_id, 'v', img_resize_ratio, 0);
+			generate_MSER_candidates(G_td.img_orig_v, img_id, 'v', img_resize_ratio, 1);
+		} else {
+			// generate ER candidates
+			generate_ER_candidates(G_td.img_orig_y, img_id, 'y', img_resize_ratio, 0);
+			generate_ER_candidates(G_td.img_orig_y, img_id, 'y', img_resize_ratio, 1);
+			generate_ER_candidates(G_td.img_orig_u, img_id, 'u', img_resize_ratio, 0);
+			generate_ER_candidates(G_td.img_orig_u, img_id, 'u', img_resize_ratio, 1);
+			generate_ER_candidates(G_td.img_orig_v, img_id, 'v', img_resize_ratio, 0);
+			generate_ER_candidates(G_td.img_orig_v, img_id, 'v', img_resize_ratio, 1);
+		}
 	}
 
 	return 0;
@@ -334,15 +263,16 @@ int init()
 	G_td.output_fn_format = "img_%d";
 
 	// Output mode
-	G_td.output_mode = SAVE_ER_AS_BIN_PNG;
+	//G_td.output_mode = SAVE_ER_AS_BIN_PNG;
 	//G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
 	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
-	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
+	G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
 
 	// Get ER algo
-	G_td.get_ER_algo = ER_ALGO_NO_PRUNING;                    
-	//G_td.get_ER_algo = ER_ALGO_SIZE_VAR_WITH_AR_PENALTY;
-	//G_td.get_ER_algo = ER_ALGO_POSTP_THEN_SIZE_VAR;
+	//G_td.get_ER_algo = MSER;
+	//G_td.get_ER_algo = ER_NO_PRUNING;
+	G_td.get_ER_algo = ER_SIZE_VAR_WITH_AR_PENALTY;
+	//G_td.get_ER_algo = ER_POSTP_THEN_SIZE_VAR;
 
 	// check if in / out path exists
 	struct stat s;
@@ -369,7 +299,6 @@ void main(void)
 {
 	if (init() == -1) {int c; scanf("%c",&c); return;}
 
-	//ICDAR2013_generate_MSER_candidates();
 	ICDAR2013_generate_ER_candidates();
 	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();
