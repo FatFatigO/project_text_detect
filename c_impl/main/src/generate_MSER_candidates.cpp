@@ -69,14 +69,14 @@ static void draw_ER_rectangle_in_original_image_and_save(vector<vector<Point>> c
 			t = min(t, pt.y);
 			b = max(b, pt.y);
 		}
-		cvRectangle(&img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(&img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(&img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(&img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(r*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(b*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(l*1.0/G_td.img_resize_ratio),(int)(t*1.0/G_td.img_resize_ratio)), color, 2);
 	}
 	
 	// save image

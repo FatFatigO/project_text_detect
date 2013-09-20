@@ -374,14 +374,14 @@ static void draw_ER_rectangle_in_original_image_and_save(ER_un_t *cur, int no_un
 		color = CV_RGB(0, 0, 255);
 	for (int i=0; i<no_union; i++, cur=cur->next) {
 		ER_t *T = cur->ER;
-		cvRectangle(&img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(&img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(&img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
-		cvRectangle(&img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
-						  cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(T->r*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), color, 2);
+		line(img, cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->b*1.0/G_td.img_resize_ratio)), 
+				  cvPoint((int)(T->l*1.0/G_td.img_resize_ratio),(int)(T->t*1.0/G_td.img_resize_ratio)), color, 2);
 	}
 	
 	// save image
@@ -453,7 +453,6 @@ static void save_ER_as_binary_png(ER_un_t *cur, int no_union)
 		//waitKey(0);
 	}
 }
-
 
 void calc_ER_postp(void)
 {

@@ -41,9 +41,9 @@ int ICDAR2013_generate_ER_candidates(void)
 		G_td.img_orig_yuv = &img_yuv;
 
 		// resize if needed
-		if (img_yuv.rows > max_width) {
-			img_resize_ratio = max_width*1.0f / img_yuv.rows;
-			cv::resize(img_yuv, img_yuv_ok, Size(max_width, (int)(img_yuv.cols*img_resize_ratio)));
+		if (img_yuv.cols > max_width) {
+			img_resize_ratio = max_width*1.0f / img_yuv.cols;
+			cv::resize(img_yuv, img_yuv_ok, Size(max_width, (int)(img_yuv.rows*img_resize_ratio)));
 		} else {
 			img_yuv_ok = img_yuv;
 		}
@@ -134,7 +134,7 @@ int ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth(void)
 
 	// write output data
 	char fn_out[MAX_FN_LEN];
-	sprintf(fn_out, "%s/ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth.txt", G_td.output_path);
+	sprintf(fn_out, "%s/Recall_rate_rectangle_level.txt", G_td.output_path);
 	FILE *f_out = fopen(fn_out, "w");
 	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
 			ICDAR_2013_start_img_no,
@@ -190,7 +190,7 @@ int ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth(void)
 
 	// write output data
 	char fn_out[MAX_FN_LEN];
-	sprintf(fn_out, "%s/ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth.txt", G_td.output_path);
+	sprintf(fn_out, "%s/Recall_rate_pixel_level.txt", G_td.output_path);
 	FILE *f_out = fopen(fn_out, "w");
 	fprintf(f_out, "Recall Rate of img:%d~%d is %f",
 			ICDAR_2013_start_img_no,
@@ -251,12 +251,12 @@ int init()
 	memset(&G_td, 0, sizeof(G_td));
 
 	// Ground truth
-	sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png");
-	//sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt");
+	//sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png");
+	sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt");
 
 	// Input
-	sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
-	//sprintf(in, "../../../../../TestResult/ICDAR_2013/ER_a3/txt");
+	//sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
+	sprintf(in, "../../../../../TestResult/ICDAR_2013/txt/MSER");
 
 	// Output
 	sprintf(out, "../../../../../TestResult/ICDAR_2013");
@@ -264,14 +264,14 @@ int init()
 
 	// Output mode
 	//G_td.output_mode = SAVE_ER_AS_BIN_PNG;
-	//G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
+	G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
 	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
-	G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
+	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
 
 	// Get ER algo
-	//G_td.get_ER_algo = MSER;
+	G_td.get_ER_algo = MSER_ORGINAL;
 	//G_td.get_ER_algo = ER_NO_PRUNING;
-	G_td.get_ER_algo = ER_SIZE_VAR_WITH_AR_PENALTY;
+	//G_td.get_ER_algo = ER_SIZE_VAR_WITH_AR_PENALTY;
 	//G_td.get_ER_algo = ER_POSTP_THEN_SIZE_VAR;
 
 	// check if in / out path exists
@@ -299,8 +299,8 @@ void main(void)
 {
 	if (init() == -1) {int c; scanf("%c",&c); return;}
 
-	ICDAR2013_generate_ER_candidates();
+	//ICDAR2013_generate_ER_candidates();
 	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();
-	//ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt();
+	ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt();
 }
