@@ -458,7 +458,7 @@ void calc_ER_postp(void)
 {
 	/* Hook up boost classifier */
 	CvBoost boost;
-	boost.load("./boost_4fv.xml", "boost");
+	boost.load("../../main/trained/boost_4fv.xml", "boost");
 	G_td.boost = (CvBoost *)&boost;
 
 	/* Calc postp at a time */

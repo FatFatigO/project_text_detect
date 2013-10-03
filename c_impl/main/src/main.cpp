@@ -241,7 +241,7 @@ int ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt(void)
 	return 0;
 }
 
-int ICDAR2013_random_copy_n_ERs_from_one_to_another_folder()
+int ICDAR2013_random_copy_n_ERs_from_one_to_another_folder(void)
 {
 	int n = 2500;
 
@@ -272,38 +272,208 @@ int ICDAR2013_random_copy_n_ERs_from_one_to_another_folder()
 	return 0;
 }
 
+int ICDAR2013_feature_extract_and_train_from_binary_patch(void)
+{
+	// allocate mat for feature vectors
+	const int nPosSample = 600;
+	const int nNegSample = 1900;
+	const int ntestsamples = nPosSample + nNegSample;
+	CvMat* featureVectorSamples = cvCreateMat(ntestsamples, 4, CV_32F);
+
+	int var_count = featureVectorSamples->cols; // number of single features=variables
+	int nsamples_all = featureVectorSamples->rows; // number of samples=feature vectors
+
+	 CvMat* classLabelResponses = cvCreateMat(nsamples_all, 1, CV_32S);
+    {
+        CvMat mat;
+        cvGetRows(classLabelResponses, &mat, 0, nPosSample);
+        cvSet(&mat, cvRealScalar(1));
+    }
+    {
+        CvMat mat;
+        cvGetRows(classLabelResponses, &mat, nPosSample, nsamples_all);
+        cvSet(&mat, cvRealScalar(-1));
+    }
+
+	// process each images
+	int processed_all = 0;
+	for (int type = 0; type <= 1; type++) {
+
+		int target_no = (type==0) ? nPosSample : nNegSample;
+		int processed_no = 0;
+
+		for (int img_id = G_td.img_start; (img_id <= G_td.img_end) && (processed_no < target_no); img_id++) {
+
+			Mat img;
+			char fn[MAX_FN_LEN], img_fn[MAX_FN_LEN];
+
+			// check if output image exist
+			int file_exist = 0;
+			//img_id = 30936;/// for debuging
+			sprintf(img_fn, G_td.output_fn_format, img_id);
+			if (type == 0)
+				sprintf(fn, "%s/Yes/%s.png", G_td.input_path, img_fn);
+			else
+				sprintf(fn, "%s/No/%s.png", G_td.input_path, img_fn);
+			if (FILE * file = fopen(fn, "r")) {
+				fclose(file);
+				file_exist = 1;
+			} else {
+				continue;
+			}
+
+			// load image
+			//sprintf(fn, "%s/img_%d.png", G_td.input_path, img_id);
+			img = imread(fn, CV_LOAD_IMAGE_GRAYSCALE);
+			assert(img.data);
+			Mat map(img.rows, img.cols, CV_32SC1, Scalar(0));
+
+			// create pts array for imfeat extraction
+			LinkedPoint *pts = (LinkedPoint*)malloc((img.rows*img.cols+1)*sizeof(pts[0]));
+			memset(pts, 0, (img.rows*img.cols+1)*sizeof(pts[0]));
+
+			// create dummy pt for boundary case
+			LinkedPoint *dummy_pt = &pts[img.rows*img.cols];
+			dummy_pt->l = dummy_pt; dummy_pt->t = dummy_pt;
+			dummy_pt->r = dummy_pt; dummy_pt->b = dummy_pt;
+			dummy_pt->pt.x = -1; dummy_pt->pt.y = -1;
+			dummy_pt->flag = 0x010;		//#define PXL_IMG_EDG		0x010
+
+			// create pts array for feature extraction
+			int pt_order = 0, pt_first = -1;
+			LinkedPoint *cur_pt = &pts[0], *row_1st_pt = NULL, *last_pt = NULL;
+			for (int h=0; h<img.rows; h++) {
+				for (int w=0; w<img.cols; w++) {
+					cur_pt = &pts[h*img.cols+w];
+					cur_pt->pt.x = w;
+					cur_pt->pt.y = h;
+					cur_pt->l = (w==0)          ? dummy_pt : &pts[h*img.cols+w-1];
+					cur_pt->r = (w==img.cols-1) ? dummy_pt : &pts[h*img.cols+w+1];
+					cur_pt->t = (h==0)          ? dummy_pt : &pts[(h-1)*img.cols+w];
+					cur_pt->b = (h==img.rows-1) ? dummy_pt : &pts[(h+1)*img.cols+w];
+					if (img.at<uchar>(h,w) != 0) {
+						cur_pt->prev = (last_pt==NULL) ? cur_pt : last_pt;
+						if (pt_order > 0)
+							cur_pt->prev->next = cur_pt;
+						last_pt = cur_pt;
+						cur_pt->pt_order = pt_order;
+						if (pt_first==-1)
+							pt_first = h*img.cols+w;
+						pt_order++;
+					}
+					if (cur_pt->l==dummy_pt && cur_pt!=dummy_pt)
+						row_1st_pt = cur_pt;
+					if (cur_pt->l!=dummy_pt && cur_pt==dummy_pt)
+						row_1st_pt = NULL;
+					if (row_1st_pt!=NULL)
+						cur_pt->prev = row_1st_pt; //overwrite prev as row_1st_pt for each data pt
+				}
+			}
+
+			// extract raw features
+			p8_t pt;
+			pt.val[0] = (u32)pts;
+			pt.val[1] = img.rows;
+			pt.val[2] = img.cols;
+			pt.val[3] = 0;
+			pt.val[6] = pt_first;
+			pt.val[7] = pt_order;//img.cols*img.rows;
+			p4_t bb_in, bb_out;
+			get_BoundingBox(&pt, &bb_in, &bb_out);
+
+			p1_t pr_in, pr_out;
+			get_Perimeter(&pt, &pr_in, &pr_out);
+
+			p1_t eu_in, eu_out;
+			get_EulerNo(&pt, &eu_in, &eu_out);
+
+			p1_t hc_in, hc_out;
+			int *hc_vect = (int *)malloc(img.rows*sizeof(int));
+			memset(hc_vect, 0, img.rows*sizeof(int));
+			hc_out.val[0] = (u32)hc_vect;
+			get_HzCrossing(&pt, &hc_in, &hc_out);
+
+			// prepare features (1~3) : aspect ratio, compactness, no of holes */
+			int w = bb_out.val[2] - bb_out.val[0] + 1;
+			int h = bb_out.val[3] - bb_out.val[1] + 1;
+			float ar = (float)(h * 1.0 / w);  
+			float cp = (float)(sqrt((double)pt_order) * 1.0 / pr_out.val[0]);
+			float nh = (float)(1 - eu_out.val[0]);
+
+			int hcs[3];
+			hcs[0] = hc_vect[(int)floor(h*1.0/6)];
+			hcs[1] = hc_vect[(int)floor(h*3.0/6)];
+			hcs[2] = hc_vect[(int)floor(h*5.0/6)];
+			for (int k=2; k>0; k--) {
+				for (int j=2; j>0; j--) {
+					if (hcs[j]<hcs[j-1]) {
+						int tmp = hcs[j-1];
+						hcs[j-1] = hcs[j];
+						hcs[j] = tmp;
+					}
+				}
+			}
+			float hc = (float)hcs[1]; // median
+
+			// write to feature vector
+			featureVectorSamples->data.fl[processed_all*4] = ar;
+			featureVectorSamples->data.fl[processed_all*4+1] = cp;
+			featureVectorSamples->data.fl[processed_all*4+2] = nh;
+			featureVectorSamples->data.fl[processed_all*4+3] = hc;
+
+			processed_all ++;
+			processed_no ++;
+			printf("img %d is done.\n", img_id);
+		}
+		printf("[type %d] %d images is processed.\n", type, processed_no);
+	}
+
+	// adaboost training
+	CvMat* var_type = cvCreateMat(var_count + 1, 1, CV_8U);
+    cvSet(var_type, cvScalarAll(CV_VAR_ORDERED)); // Inits all to 0 like the code below
+	var_type->data.ptr[var_count] = CV_VAR_CATEGORICAL;
+
+	char fn_out[MAX_FN_LEN];
+	sprintf(fn_out, "%s/boost_4fv.xml", G_td.output_path);
+	CvBoost boost;
+	boost.train(featureVectorSamples, CV_ROW_SAMPLE, classLabelResponses, 0, 0, var_type, 0, CvBoostParams(CvBoost::REAL, 100, 0.95, 5, false, 0));
+	boost.save(fn_out, "boost");
+
+	return 0;
+}
+
 int init()
 {
 	memset(&G_td, 0, sizeof(G_td));
 
 	G_td.global_cnt = 0;//970190;
 	G_td.img_start = 1;//301;
-	G_td.img_end = 1466742;//233(Test),410(Trian),1466742(TrainERs)
+	G_td.img_end = 233;//233(Test),410(Trian),1466742(TrainERs)
 
 	// Ground truth
 	//sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_png");
 	sprintf(in_gdtr, "../../../../../Dataset/ICDAR_2013/SceneTest_GroundTruth_txt");
 
 	// Input
-	//sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
+	sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTest");
 	//sprintf(in, "../../../../../Dataset/ICDAR_2013/SceneTrain");
-	sprintf(in, "../../../../../TestResult/ICDAR_2013/Train_ER_all");
+	//sprintf(in, "../../../../../TestResult/ICDAR_2013");
 
 	// Output
-	sprintf(out, "../../../../../TestResult/ICDAR_2013/Train_ER_selected");
+	sprintf(out, "../../../../../TestResult/ICDAR_2013");
 	G_td.output_fn_format = "img_%d";
 
 	// Output mode
-	G_td.output_mode = SAVE_ER_AS_BIN_PNG;
-	//G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
+	//G_td.output_mode = SAVE_ER_AS_BIN_PNG;
+	G_td.output_mode = DRAW_ER_RECT_IN_ORIGINAL_IMAGE_AND_SAVE;
 	//G_td.output_mode = DRAW_ER_RECT_IN_GNDTRUTH_IMAGE_AND_SAVE;
 	//G_td.output_mode = SAVE_ER_AS_TEXT_FILE;
 
 	// Get ER algo
 	//G_td.get_ER_algo = MSER_ORGINAL;
-	G_td.get_ER_algo = ER_NO_PRUNING;
+	//G_td.get_ER_algo = ER_NO_PRUNING;
 	//G_td.get_ER_algo = ER_SIZE_VAR_WITH_AR_PENALTY;
-	//G_td.get_ER_algo = ER_POSTP_THEN_SIZE_VAR;
+	G_td.get_ER_algo = ER_POSTP_THEN_SIZE_VAR;
 
 	// check if in / out path exists
 	struct stat s;
@@ -330,8 +500,9 @@ void main(void)
 {
 	if (init() == -1) {int c; scanf("%c",&c); return;}
 
+	//ICDAR2013_feature_extract_and_train_from_binary_patch();
 	//ICDAR2013_random_copy_n_ERs_from_one_to_another_folder();
-	//ICDAR2013_generate_ER_candidates();
+	ICDAR2013_generate_ER_candidates();
 	//ICDAR2013_evaluate_ER_candidates_by_txt_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_png_GroundTruth();
 	//ICDAR2013_evaluate_ER_candidates_by_gen_stats_from_txt();

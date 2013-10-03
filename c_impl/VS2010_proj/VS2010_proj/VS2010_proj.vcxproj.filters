@@ -50,9 +50,6 @@
     <ClCompile Include="..\..\main\src\imfeat\imfeat_binary_get_HzCrossing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\main\src\evaluate.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\main\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
