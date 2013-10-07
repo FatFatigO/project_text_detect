@@ -526,7 +526,7 @@ void get_ERs_pruned_and_output()
 	int no_union = 0;
 	ER_un_t *unions = NULL;
 
-	if (G_td.get_ER_algo == ER_NO_PRUNING) {
+	if ((G_td.ER_no <= 1) || (G_td.get_ER_algo == ER_NO_PRUNING)) {
 
 		G_td.ER_un[0].ER = &G_td.ERs[0];
 		G_td.ER_un[0].prev = NULL;
